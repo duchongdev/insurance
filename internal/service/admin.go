@@ -1,0 +1,162 @@
+package service
+
+import (
+	"errors"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/huaan/insurance-bridge/internal/model"
+	"github.com/huaan/insurance-bridge/internal/repository"
+	"golang.org/x/crypto/bcrypt"
+)
+
+// ErrInvalidCredentials 登录或 JWT 校验失败时返回。
+var ErrInvalidCredentials = errors.New("invalid credentials")
+
+// AdminService 管理后台业务：认证、渠道 CRUD、审计日志与抽取数据的分页查询。
+type AdminService struct {
+	admins    *repository.AdminRepo
+	channels  *repository.ChannelRepo
+	biz       *repository.BusinessRepo
+	logs      *repository.LogRepo
+	jwtSecret []byte
+}
+
+// NewAdminService 注入各仓储与 JWT 签名密钥。
+func NewAdminService(
+	admins *repository.AdminRepo,
+	channels *repository.ChannelRepo,
+	biz *repository.BusinessRepo,
+	logs *repository.LogRepo,
+	jwtSecret string,
+) *AdminService {
+	return &AdminService{
+		admins:    admins,
+		channels:  channels,
+		biz:       biz,
+		logs:      logs,
+		jwtSecret: []byte(jwtSecret),
+	}
+}
+
+// Login 校验用户名密码，成功签发 HS256 JWT（sub=username，有效期 24 小时）。
+func (s *AdminService) Login(username, password string) (string, error) {
+	u, err := s.admins.GetByUsername(username)
+	if err != nil {
+		return "", ErrInvalidCredentials
+	}
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)) != nil {
+		return "", ErrInvalidCredentials
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": username,
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	})
+	return token.SignedString(s.jwtSecret)
+}
+
+// ParseToken 解析并校验 JWT，返回 subject（用户名）。
+func (s *AdminService) ParseToken(tokenStr string) (string, error) {
+	t, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		return s.jwtSecret, nil
+	})
+	if err != nil || !t.Valid {
+		return "", ErrInvalidCredentials
+	}
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", ErrInvalidCredentials
+	}
+	sub, _ := claims["sub"].(string)
+	return sub, nil
+}
+
+// HashPassword 使用 bcrypt 生成密码哈希，供 seed 与改密使用。
+func HashPassword(p string) (string, error) {
+	b, err := bcrypt.GenerateFromPassword([]byte(p), bcrypt.DefaultCost)
+	return string(b), err
+}
+
+// ListChannels 分页查询渠道列表。
+func (s *AdminService) ListChannels(page, size int) ([]model.Channel, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.channels.List((page-1)*size, size)
+}
+
+// CreateChannel 创建渠道；ChannelKey 为空时调用 GenerateChannelKey 自动生成。
+func (s *AdminService) CreateChannel(ch *model.Channel) error {
+	if ch.ChannelKey == "" {
+		ch.ChannelKey = GenerateChannelKey()
+	}
+	return s.channels.Create(ch)
+}
+
+// UpdateChannel 全量更新渠道记录（GORM Save）。
+func (s *AdminService) UpdateChannel(ch *model.Channel) error {
+	return s.channels.Update(ch)
+}
+
+// DeleteChannel 按主键删除渠道。
+func (s *AdminService) DeleteChannel(id uint64) error {
+	return s.channels.Delete(id)
+}
+
+// GetChannel 按 ID 查询单条渠道。
+func (s *AdminService) GetChannel(id uint64) (*model.Channel, error) {
+	return s.channels.GetByID(id)
+}
+
+// Stats 聚合保单、用户、签约、接口日志数量；channelCode 非空时按渠道过滤。
+func (s *AdminService) Stats(channelCode string) (map[string]interface{}, error) {
+	return s.biz.Stats(channelCode)
+}
+
+// ListLogs 分页查询接口审计日志。
+func (s *AdminService) ListLogs(channelCode, apiPath string, page, size int) ([]model.APIRequestLog, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.logs.List(channelCode, apiPath, (page-1)*size, size)
+}
+
+// ListPolicies 分页查询保单抽取记录。
+func (s *AdminService) ListPolicies(channelCode string, page, size int) ([]model.PolicyRecord, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.biz.ListPolicies(channelCode, (page-1)*size, size)
+}
+
+// ListUsers 分页查询用户抽取记录。
+func (s *AdminService) ListUsers(channelCode string, page, size int) ([]model.UserRecord, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.biz.ListUsers(channelCode, (page-1)*size, size)
+}
+
+// ListSigns 分页查询签约抽取记录。
+func (s *AdminService) ListSigns(channelCode string, page, size int) ([]model.SignRecord, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.biz.ListSigns(channelCode, (page-1)*size, size)
+}

@@ -1,0 +1,130 @@
+// 华安保险渠道对接服务入口。
+//
+// 启动流程：加载配置 → 初始化日志/加密/数据库 → Seed 默认管理员 → 组装代理与管理服务 →
+// 注册路由（渠道 API、管理 API、健康检查、静态后台）→ 启动日志清理定时任务 → 优雅关闭。
+package main
+
+import (
+	"context"
+	"embed"
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/huaan/insurance-bridge/internal/bootstrap"
+	"github.com/huaan/insurance-bridge/internal/config"
+	"github.com/huaan/insurance-bridge/internal/handler"
+	"github.com/huaan/insurance-bridge/internal/job"
+	"github.com/huaan/insurance-bridge/internal/middleware"
+	"github.com/huaan/insurance-bridge/internal/pkg/cipher"
+	"github.com/huaan/insurance-bridge/internal/pkg/logger"
+	"github.com/huaan/insurance-bridge/internal/pkg/pii"
+	"github.com/huaan/insurance-bridge/internal/repository"
+	"github.com/huaan/insurance-bridge/internal/service"
+	"go.uber.org/zap"
+)
+
+// adminFS 内嵌管理后台静态资源（web/admin），通过 /admin 路径对外提供。
+//
+//go:embed all:web/admin
+var adminFS embed.FS
+
+func main() {
+	// --- 配置与基础设施 ---
+	cfgPath := os.Getenv("CONFIG_PATH")
+	if cfgPath == "" {
+		cfgPath = "config/config.yaml"
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		panic(err)
+	}
+
+	log, err := logger.New(cfg.Log.Level, cfg.Log.FilePath)
+	if err != nil {
+		panic(err)
+	}
+	defer log.Sync()
+
+	crypter, err := cipher.New(cfg.Security.DataEncryptionKey)
+	if err != nil {
+		log.Fatal("invalid encryption key", zap.Error(err))
+	}
+
+	db, err := repository.NewDB(cfg.Database.DSN)
+	if err != nil {
+		log.Fatal("db connect failed", zap.Error(err))
+	}
+
+	// --- 仓储与首次启动 Seed ---
+	channelRepo := repository.NewChannelRepo(db)
+	logRepo := repository.NewLogRepo(db)
+	bizRepo := repository.NewBusinessRepo(db)
+	adminRepo := repository.NewAdminRepo(db)
+
+	if err := bootstrap.Seed(cfg, adminRepo, log); err != nil {
+		log.Fatal("seed failed", zap.Error(err))
+	}
+
+	// --- 业务服务 ---
+	extractor := service.NewExtractor(bizRepo, crypter)
+	piiTransformer := pii.NewTransformer(crypter)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, extractor, piiTransformer)
+	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, logRepo, cfg.Security.JWTSecret)
+
+	// --- HTTP 路由 ---
+	gin.SetMode(cfg.Server.Mode)
+	r := gin.New()
+	r.Use(gin.Recovery(), middleware.Trace())
+
+	health := handler.NewHealthHandler(db)
+	r.GET("/health/live", health.Live)
+	r.GET("/health/ready", health.Ready)
+
+	channelHandler := handler.NewChannelHandler(proxySvc)
+	api := r.Group(cfg.HuaAn.APIPath)
+	channelHandler.Register(api)
+
+	adminHandler := handler.NewAdminHandler(adminSvc)
+	adminHandler.Register(r.Group("/admin/api"))
+
+	adminSub, _ := fs.Sub(adminFS, "web/admin")
+	r.StaticFS("/admin", http.FS(adminSub))
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/admin/")
+	})
+	r.StaticFile("/openapi.yaml", "api/openapi.yaml")
+
+	// --- 后台任务：过期接口日志清理与文件日志归档 ---
+	cleanup := job.NewCleanupJob(logRepo, log, cfg.Log.RetentionDays, cfg.Log.FilePath, cfg.Log.ArchiveEnabled)
+	cleanup.Start()
+
+	srv := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:      r,
+		ReadTimeout:  cfg.Server.ReadTimeout,
+		WriteTimeout: cfg.Server.WriteTimeout,
+	}
+
+	go func() {
+		log.Info("server started", zap.Int("port", cfg.Server.Port))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("listen failed", zap.Error(err))
+		}
+	}()
+
+	// --- 优雅关闭 ---
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(ctx)
+	log.Info("server stopped")
+}

@@ -1,0 +1,39 @@
+services:
+  mysql:
+    image: mariadb:11.4
+    container_name: insurance-bridge-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: insurance_bridge
+      MYSQL_USER: bridge
+      MYSQL_PASSWORD: bridge123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bridge:
+    build: .
+    container_name: insurance-bridge-app
+    ports:
+      - "8080:8080"
+    environment:
+      CONFIG_PATH: /app/config/config.yaml
+      BRIDGE_DATABASE_DSN: bridge:bridge123@tcp(mysql:3306)/insurance_bridge?charset=utf8mb4&parseTime=True&loc=Local
+      BRIDGE_HUAAN_BASE_URL: https://xx.xxx.api.york.xin
+      BRIDGE_SECURITY_DATA_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef"
+      BRIDGE_SECURITY_JWT_SECRET: "change-me-in-production-jwt-secret-key"
+    volumes:
+      - ./logs:/app/logs
+      - ./config/config.yaml:/app/config/config.yaml
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

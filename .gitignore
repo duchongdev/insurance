@@ -1,0 +1,6 @@
+logs/
+*.log
+bridge
+.DS_Store
+.idea/
+.vscode/

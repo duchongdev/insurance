@@ -1,0 +1,155 @@
+openapi: 3.0.3
+info:
+  title: 华安保险渠道对接服务 API
+  description: |
+    渠道商调用本服务，本服务验签、解密三要素后转发华安，并将华安响应原样返回（三要素字段加密）。
+    管理后台 API 需 Bearer Token。
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /health/live:
+    get:
+      summary: 存活探针
+      responses:
+        '200':
+          description: ok
+  /health/ready:
+    get:
+      summary: 就绪探针（含数据库）
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/proInsurance:
+    post:
+      tags: [渠道接口]
+      summary: ZF-预投保
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedRequest'
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/upGradeIns:
+    post:
+      tags: [渠道接口]
+      summary: 保单升级
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getSignUrl:
+    post:
+      tags: [渠道接口]
+      summary: 获取签约链接
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/verifyNoCode:
+    post:
+      tags: [渠道接口]
+      summary: 用户注册
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getPolicyInfoByPhoneNo:
+    post:
+      tags: [渠道接口]
+      summary: 查询用户保单
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getProductPricesByProductCode:
+    post:
+      tags: [渠道接口]
+      summary: 查询产品价格
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getBankList:
+    post:
+      tags: [渠道接口]
+      summary: 获取银行列表
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getProductInfoByChannel:
+    post:
+      tags: [渠道接口]
+      summary: 渠道查询产品
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getProductPricesByPolicyId:
+    post:
+      tags: [渠道接口]
+      summary: 保单ID查价格
+      responses:
+        '200':
+          description: ok
+  /upChannelApi/getPolicyInfoByPolicyId:
+    post:
+      tags: [渠道接口]
+      summary: 保单ID查信息
+      responses:
+        '200':
+          description: ok
+  /admin/api/login:
+    post:
+      tags: [管理后台]
+      summary: 管理员登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: token
+  /admin/api/channels:
+    get:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 渠道列表
+    post:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 创建渠道
+  /admin/api/stats:
+    get:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 统计概览
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    SignedRequest:
+      type: object
+      required: [timestamp, channelCode, sign, key]
+      properties:
+        timestamp: { type: string }
+        channelCode: { type: string }
+        key: { type: string, description: 本服务分配的渠道密钥 }
+        sign: { type: string }
+        phoneNo: { type: string, description: AES-GCM Base64 密文 }
+        name: { type: string, description: AES-GCM Base64 密文 }
+        idCard: { type: string, description: AES-GCM Base64 密文 }
+    ApiResponse:
+      type: object
+      properties:
+        code: { type: integer, example: 200 }
+        message: { type: string }
+        data: { type: object }
