@@ -2,7 +2,7 @@
 services:
   mysql:
     image: ${MYSQL_IMAGE:-mariadb:10.6}
-    container_name: insurance-bridge-mysql
+    container_name: ins-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
@@ -21,7 +21,7 @@ services:
 
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
-    container_name: insurance-bridge-redis
+    container_name: ins-redis
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}"]
     volumes:
@@ -37,7 +37,7 @@ services:
   bridge:
     image: ${BRIDGE_IMAGE:-insurance-bridge:local}
     build: .
-    container_name: insurance-bridge-app
+    container_name: ins-app
     restart: unless-stopped
     env_file:
       - .env
@@ -55,7 +55,7 @@ services:
 
   nginx:
     image: ${NGINX_IMAGE:-nginx:1.26-alpine}
-    container_name: insurance-bridge-nginx
+    container_name: ins-nginx
     restart: unless-stopped
     ports:
       - "${APP_PORT:-5051}:80"
