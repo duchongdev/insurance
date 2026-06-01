@@ -7,9 +7,9 @@
 - **渠道 API**：完整实现 `ZF保险.md` 中 `/upChannelApi` 下 10 个接口
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
-- **数据落库**：接口日志、用户、保单、签约、产品、付费流水、银行信息（`bank_info_t`）；`getBankList` 管理后台可全量同步，渠道侧优先 Redis → 库 → 华安
+- **数据落库**：用户、保单、签约、产品、付费流水、银行信息（`bank_info_t`）；渠道 API 调用详情写入服务日志文件
 - **管理后台**：Vue 3 + Element Plus（`web/admin/`），Nginx 托管 `/admin/`，REST API 在 `/admin/api`
-- **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化日志、90 天日志清理与归档
+- **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化服务日志（轮转、gzip 归档、90 天自动清理）
 
 ## 快速启动
 
@@ -57,6 +57,17 @@ cp config/config.yaml.example config/config.yaml
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，三要素与库内敏感字段 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT |
 | `BRIDGE_SERVER_UPSTREAM_TIMEOUT` | 华安调用超时，默认 25s |
+| `BRIDGE_LOG_LEVEL` | 服务日志级别：`debug`（测试）/ `info`（生产） |
+| `log.retention_days` | 日志文件保留天数，默认 90 |
+| `log.archive_enabled` | 轮转后 gzip 压缩，默认 true |
+| `log.max_size_mb` | 单文件上限（MB），达到后轮转，默认 100 |
+
+### 服务日志
+
+- 路径：`./logs/app.log`（Docker 映射至宿主机 `logs/`）
+- 渠道 API 调用：`info` 记录摘要（traceId、渠道、路径、响应码、耗时）；`debug` 记录脱敏请求与华安响应全文
+- 轮转：lumberjack 按文件大小轮转，旧文件 gzip 压缩；超过 `retention_days` 自动删除
+- 每日 03:00 额外扫描 `logs/` 清理遗留过期文件
 
 ## 渠道接入说明
 
@@ -107,7 +118,6 @@ docker-compose.yml
 | 表 | 用途 |
 |----|------|
 | channels | 渠道与双密钥映射 |
-| api_request_logs | 全量请求/响应（脱敏请求） |
 | user_records | 用户（加密存储） |
 | policy_records | 保单 |
 | sign_records | 签约 |

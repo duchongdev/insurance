@@ -21,7 +21,6 @@ const router = createRouter({
         { path: 'users', name: 'users', component: () => import('@/views/UsersView.vue'), meta: { title: '用户' } },
         { path: 'signs', name: 'signs', component: () => import('@/views/SignsView.vue'), meta: { title: '签约' } },
         { path: 'banks', name: 'banks', component: () => import('@/views/BanksView.vue'), meta: { title: '银行列表' } },
-        { path: 'logs', name: 'logs', component: () => import('@/views/LogsView.vue'), meta: { title: '接口日志' } },
       ],
     },
   ],

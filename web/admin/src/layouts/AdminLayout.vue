@@ -16,7 +16,6 @@ const menuItems = [
   { path: '/users', title: '用户', icon: 'User' },
   { path: '/signs', title: '签约', icon: 'EditPen' },
   { path: '/banks', title: '银行列表', icon: 'Money' },
-  { path: '/logs', title: '接口日志', icon: 'List' },
 ]
 
 function logout() {

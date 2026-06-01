@@ -21,7 +21,6 @@ func NewDB(dsn string) (*gorm.DB, error) {
 	if err := db.AutoMigrate(
 		&model.Channel{},
 		&model.AdminUser{},
-		&model.APIRequestLog{},
 		&model.UserRecord{},
 		&model.PolicyRecord{},
 		&model.SignRecord{},

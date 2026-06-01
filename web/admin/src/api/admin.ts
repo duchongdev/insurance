@@ -9,7 +9,6 @@ export interface Stats {
   policyCount: number
   userCount: number
   signCount: number
-  apiLogCount: number
 }
 
 export interface Channel {
@@ -62,17 +61,6 @@ export interface BankRecord {
   updateTime?: string
 }
 
-export interface LogRecord {
-  id: number
-  traceId: string
-  channelCode?: string
-  apiPath: string
-  huaanCode?: number
-  durationMS?: number
-  errorMessage?: string
-  createdAt?: string
-}
-
 export function login(username: string, password: string) {
   return request.post<{ token: string }>('/login', { username, password })
 }
@@ -114,17 +102,6 @@ export function fetchSigns(page: number, size: number, channelCode?: string) {
 export function fetchBanks(page: number, size: number, status?: number) {
   return request.get<PageResult<BankRecord>>('/banks', {
     params: { page, size, status: status || undefined },
-  })
-}
-
-export function fetchLogs(page: number, size: number, channelCode?: string, apiPath?: string) {
-  return request.get<PageResult<LogRecord>>('/logs', {
-    params: {
-      page,
-      size,
-      channelCode: channelCode || undefined,
-      apiPath: apiPath || undefined,
-    },
   })
 }
 

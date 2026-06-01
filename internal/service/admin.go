@@ -13,12 +13,11 @@ import (
 // ErrInvalidCredentials 登录或 JWT 校验失败时返回。
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
-// AdminService 管理后台业务：认证、渠道 CRUD、审计日志与抽取数据的分页查询。
+// AdminService 管理后台业务：认证、渠道 CRUD 与抽取数据的分页查询。
 type AdminService struct {
 	admins    *repository.AdminRepo
 	channels  *repository.ChannelRepo
 	biz       *repository.BusinessRepo
-	logs      *repository.LogRepo
 	banks     *repository.BankRepo
 	jwtSecret []byte
 }
@@ -28,7 +27,6 @@ func NewAdminService(
 	admins *repository.AdminRepo,
 	channels *repository.ChannelRepo,
 	biz *repository.BusinessRepo,
-	logs *repository.LogRepo,
 	banks *repository.BankRepo,
 	jwtSecret string,
 ) *AdminService {
@@ -36,7 +34,6 @@ func NewAdminService(
 		admins:    admins,
 		channels:  channels,
 		biz:       biz,
-		logs:      logs,
 		banks:     banks,
 		jwtSecret: []byte(jwtSecret),
 	}
@@ -115,20 +112,9 @@ func (s *AdminService) GetChannel(id uint64) (*model.Channel, error) {
 	return s.channels.GetByID(id)
 }
 
-// Stats 聚合保单、用户、签约、接口日志数量；channelCode 非空时按渠道过滤。
+// Stats 聚合保单、用户、签约数量；channelCode 非空时按渠道过滤。
 func (s *AdminService) Stats(channelCode string) (map[string]interface{}, error) {
 	return s.biz.Stats(channelCode)
-}
-
-// ListLogs 分页查询接口审计日志。
-func (s *AdminService) ListLogs(channelCode, apiPath string, page, size int) ([]model.APIRequestLog, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size <= 0 {
-		size = 20
-	}
-	return s.logs.List(channelCode, apiPath, (page-1)*size, size)
 }
 
 // ListPolicies 分页查询保单抽取记录。

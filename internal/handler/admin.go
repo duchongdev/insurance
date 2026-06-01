@@ -9,7 +9,7 @@ import (
 	"github.com/huaan/insurance-bridge/internal/service"
 )
 
-// AdminHandler 管理后台 REST API：登录、渠道 CRUD、审计日志与业务数据分页查询。
+// AdminHandler 管理后台 REST API：登录、渠道 CRUD、业务数据分页查询。
 type AdminHandler struct {
 	admin *service.AdminService
 	proxy *service.ProxyService
@@ -30,7 +30,6 @@ func (h *AdminHandler) Register(r *gin.RouterGroup) {
 	auth.POST("/channels", h.createChannel)
 	auth.PUT("/channels/:id", h.updateChannel)
 	auth.DELETE("/channels/:id", h.deleteChannel)
-	auth.GET("/logs", h.listLogs)
 	auth.GET("/policies", h.listPolicies)
 	auth.GET("/users", h.listUsers)
 	auth.GET("/signs", h.listSigns)
@@ -134,18 +133,6 @@ func (h *AdminHandler) deleteChannel(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
-}
-
-// listLogs 分页查询接口审计日志，支持 channelCode、apiPath 过滤。
-func (h *AdminHandler) listLogs(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	list, total, err := h.admin.ListLogs(c.Query("channelCode"), c.Query("apiPath"), page, size)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
 }
 
 // listPolicies 分页查询抽取的保单记录。

@@ -98,27 +98,23 @@ func (r *BusinessRepo) ListSigns(channelCode string, offset, limit int) ([]model
 	return list, total, err
 }
 
-// Stats 统计保单、用户、签约、接口日志条数，供管理后台仪表盘使用。
+// Stats 统计保单、用户、签约条数，供管理后台仪表盘使用。
 func (r *BusinessRepo) Stats(channelCode string) (map[string]interface{}, error) {
 	stats := map[string]interface{}{}
 	pq := r.db.Model(&model.PolicyRecord{})
 	uq := r.db.Model(&model.UserRecord{})
 	sq := r.db.Model(&model.SignRecord{})
-	lq := r.db.Model(&model.APIRequestLog{})
 	if channelCode != "" {
 		pq = pq.Where("channel_code = ?", channelCode)
 		uq = uq.Where("channel_code = ?", channelCode)
 		sq = sq.Where("channel_code = ?", channelCode)
-		lq = lq.Where("channel_code = ?", channelCode)
 	}
-	var policies, users, signs, logs int64
+	var policies, users, signs int64
 	_ = pq.Count(&policies).Error
 	_ = uq.Count(&users).Error
 	_ = sq.Count(&signs).Error
-	_ = lq.Count(&logs).Error
 	stats["policyCount"] = policies
 	stats["userCount"] = users
 	stats["signCount"] = signs
-	stats["apiLogCount"] = logs
 	return stats, nil
 }

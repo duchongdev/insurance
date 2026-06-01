@@ -1,72 +1,75 @@
-// Package job 后台定时任务：接口审计日志保留期清理、应用日志文件归档。
+// Package job 后台定时任务：清理超过保留期的历史日志文件。
 package job
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/huaan/insurance-bridge/internal/repository"
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"
 )
 
-// CleanupJob 按 retentionDays 删除过期 api_request_logs，并可归档过期的 zap 文件日志。
+// CleanupJob 扫描日志目录，删除修改时间早于 retentionDays 的日志及压缩归档文件。
 type CleanupJob struct {
-	logs           *repository.LogRepo
-	log            *zap.Logger
-	retentionDays  int    // 保留天数，如 90
-	logFilePath    string // 应用日志文件路径
-	archiveEnabled bool   // 是否将过期日志文件移动到 archive 子目录
+	log           *zap.Logger
+	retentionDays int
+	logFilePath   string
 }
 
 // NewCleanupJob 构造清理任务，由 main 在启动后调用 Start。
-func NewCleanupJob(logs *repository.LogRepo, log *zap.Logger, retentionDays int, logFilePath string, archiveEnabled bool) *CleanupJob {
+func NewCleanupJob(log *zap.Logger, retentionDays int, logFilePath string) *CleanupJob {
 	return &CleanupJob{
-		logs:           logs,
-		log:            log,
-		retentionDays:  retentionDays,
-		logFilePath:    logFilePath,
-		archiveEnabled: archiveEnabled,
+		log:           log,
+		retentionDays: retentionDays,
+		logFilePath:   logFilePath,
 	}
 }
 
 // Start 注册 cron 表达式 "0 3 * * *"（每天 03:00）并启动调度器。
 func (j *CleanupJob) Start() {
+	if j.logFilePath == "" {
+		return
+	}
 	c := cron.New()
 	_, _ = c.AddFunc("0 3 * * *", j.run)
 	c.Start()
 }
 
-// run 执行一次清理：删除早于 retentionDays 的 DB 日志，可选归档文件日志。
+// run 删除 logs 目录及 archive 子目录中超过保留期的 .log / .gz 文件。
 func (j *CleanupJob) run() {
-	before := time.Now().AddDate(0, 0, -j.retentionDays)
-	n, err := j.logs.DeleteBefore(before)
-	if err != nil {
-		j.log.Error("cleanup api logs failed", zap.Error(err))
-	} else {
-		j.log.Info("cleanup api logs done", zap.Int64("deleted", n))
+	retention := j.retentionDays
+	if retention <= 0 {
+		retention = 90
 	}
-	if j.archiveEnabled && j.logFilePath != "" {
-		j.archiveLogFile(before)
-	}
-}
+	before := time.Now().AddDate(0, 0, -retention)
+	logDir := filepath.Dir(j.logFilePath)
 
-// archiveLogFile 若当前日志文件修改时间早于 before，则重命名到 logs/archive/ 并创建新的空日志文件。
-func (j *CleanupJob) archiveLogFile(before time.Time) {
-	info, err := os.Stat(j.logFilePath)
-	if err != nil || info.ModTime().After(before) {
-		return
-	}
-	archiveDir := filepath.Join(filepath.Dir(j.logFilePath), "archive")
-	_ = os.MkdirAll(archiveDir, 0o755)
-	archiveName := filepath.Join(archiveDir, filepath.Base(j.logFilePath)+"."+before.Format("20060102"))
-	if err := os.Rename(j.logFilePath, archiveName); err != nil {
-		j.log.Warn("archive log file failed", zap.Error(err))
-		return
-	}
-	f, err := os.OpenFile(j.logFilePath, os.O_CREATE|os.O_WRONLY, 0o644)
-	if err == nil {
-		_ = f.Close()
-	}
+	var removed int
+	_ = filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		name := info.Name()
+		if !strings.HasSuffix(name, ".log") && !strings.HasSuffix(name, ".gz") {
+			return nil
+		}
+		// 当前正在写入的主日志由 lumberjack 管理，跳过
+		if path == j.logFilePath {
+			return nil
+		}
+		if info.ModTime().Before(before) {
+			if err := os.Remove(path); err == nil {
+				removed++
+			}
+		}
+		return nil
+	})
+
+	j.log.Info("cleanup log files done",
+		zap.String("logDir", logDir),
+		zap.Int("retentionDays", retention),
+		zap.Int("removed", removed),
+	)
 }

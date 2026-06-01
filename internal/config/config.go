@@ -53,12 +53,13 @@ type SecurityConfig struct {
 	JWTSecret         string // 管理后台 JWT 签名密钥
 }
 
-// LogConfig 应用日志与接口审计日志保留策略。
+// LogConfig 应用日志文件轮转与保留策略。
 type LogConfig struct {
-	Level          string // zap 级别：debug/info/warn/error
+	Level          string // zap 级别：debug/info/warn/error；测试建议 debug，生产建议 info
 	FilePath       string // 文件日志路径，空则仅 stdout
-	RetentionDays  int    // api_request_logs 保留天数
-	ArchiveEnabled bool   // 是否归档过期的文件日志
+	RetentionDays  int    // 日志文件保留天数，超期自动删除（默认 90）
+	ArchiveEnabled bool   // 轮转后 gzip 压缩归档
+	MaxSizeMB      int    // 单文件大小上限（MB），达到后轮转（默认 100）
 }
 
 // AdminConfig 管理后台：默认账号（Seed）与开发期 CORS。
@@ -113,6 +114,7 @@ func Load(path string) (*Config, error) {
 			FilePath:       v.GetString("log.file_path"),
 			RetentionDays:  v.GetInt("log.retention_days"),
 			ArchiveEnabled: v.GetBool("log.archive_enabled"),
+			MaxSizeMB:      v.GetInt("log.max_size_mb"),
 		},
 		Admin: AdminConfig{
 			DefaultUsername: v.GetString("admin.default_username"),
@@ -140,6 +142,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("log.file_path", "./logs/app.log")
 	v.SetDefault("log.retention_days", 90)
 	v.SetDefault("log.archive_enabled", true)
+	v.SetDefault("log.max_size_mb", 100)
 	v.SetDefault("admin.default_username", "admin")
 	v.SetDefault("admin.default_password", "admin123")
 }

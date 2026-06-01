@@ -8,7 +8,6 @@ const stats = ref<Stats>({
   policyCount: 0,
   userCount: 0,
   signCount: 0,
-  apiLogCount: 0,
 })
 
 async function loadStats() {
@@ -36,17 +35,14 @@ onMounted(loadStats)
       </div>
     </template>
     <el-row :gutter="16" v-loading="loading">
-      <el-col :span="6">
+      <el-col :span="8">
         <el-statistic title="保单" :value="stats.policyCount" />
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-statistic title="用户" :value="stats.userCount" />
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-statistic title="签约" :value="stats.signCount" />
-      </el-col>
-      <el-col :span="6">
-        <el-statistic title="接口日志" :value="stats.apiLogCount" />
       </el-col>
     </el-row>
   </el-card>

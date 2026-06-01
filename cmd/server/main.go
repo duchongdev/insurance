@@ -39,7 +39,13 @@ func main() {
 		panic(err)
 	}
 
-	log, err := logger.New(cfg.Log.Level, cfg.Log.FilePath)
+	log, err := logger.New(logger.Options{
+		Level:          cfg.Log.Level,
+		FilePath:       cfg.Log.FilePath,
+		RetentionDays:  cfg.Log.RetentionDays,
+		ArchiveEnabled: cfg.Log.ArchiveEnabled,
+		MaxSizeMB:      cfg.Log.MaxSizeMB,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -63,7 +69,6 @@ func main() {
 
 	// --- 仓储与首次启动 Seed ---
 	channelRepo := repository.NewChannelRepo(db)
-	logRepo := repository.NewLogRepo(db)
 	bizRepo := repository.NewBusinessRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
 	bankRepo := repository.NewBankRepo(db)
@@ -76,8 +81,8 @@ func main() {
 	extractor := service.NewExtractor(bizRepo, crypter)
 	piiTransformer := pii.NewTransformer(crypter)
 	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, bankRepo, extractor, piiTransformer, bankListCache)
-	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, logRepo, bankRepo, cfg.Security.JWTSecret)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, extractor, piiTransformer, bankListCache)
+	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, bankRepo, cfg.Security.JWTSecret)
 
 	// --- HTTP 路由 ---
 	gin.SetMode(cfg.Server.Mode)
@@ -104,8 +109,8 @@ func main() {
 	})
 	r.StaticFile("/openapi.yaml", "api/openapi.yaml")
 
-	// --- 后台任务：过期接口日志清理与文件日志归档 ---
-	cleanup := job.NewCleanupJob(logRepo, log, cfg.Log.RetentionDays, cfg.Log.FilePath, cfg.Log.ArchiveEnabled)
+	// --- 后台任务：清理超过保留期的历史日志文件 ---
+	cleanup := job.NewCleanupJob(log, cfg.Log.RetentionDays, cfg.Log.FilePath)
 	cleanup.Start()
 
 	srv := &http.Server{

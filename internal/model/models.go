@@ -25,20 +25,6 @@ type AdminUser struct {
 	UpdatedAt    time.Time
 }
 
-// APIRequestLog 单次渠道 API 调用的审计记录，与代理链路 trace_id 对应，供后台查询与排障。
-type APIRequestLog struct {
-	ID           uint64    `gorm:"primaryKey" json:"id"`
-	TraceID      string    `gorm:"index;size:64;not null" json:"traceId"`       // 链路 ID（代理内生成 UUID，可与 X-Trace-Id 关联）
-	ChannelCode  string    `gorm:"index;size:64" json:"channelCode"`            // 渠道编码
-	APIPath      string    `gorm:"index;size:128;not null" json:"apiPath"`      // 如 /proInsurance
-	RequestBody  string    `gorm:"type:longtext" json:"requestBody,omitempty"`  // 脱敏后的请求 JSON（三要素已 Mask）
-	ResponseBody string    `gorm:"type:longtext" json:"responseBody,omitempty"` // 华安原始响应 JSON（明文，便于对账）
-	HuaAnCode    int       `gorm:"index" json:"huaanCode"`                      // 华安响应 body.code
-	DurationMS   int64     `json:"durationMS"`                                  // 上游往返耗时（毫秒）
-	ErrorMessage string    `gorm:"size:512" json:"errorMessage,omitempty"`      // 上游失败或超时时的错误摘要
-	CreatedAt    time.Time `gorm:"index" json:"createdAt"`
-}
-
 // UserRecord 用户三要素快照（库内 AES 加密），由 /verifyNoCode 等接口响应抽取。
 type UserRecord struct {
 	ID          uint64    `gorm:"primaryKey" json:"id"`

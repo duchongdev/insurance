@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/huaan/insurance-bridge/internal/config"
-	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/pkg/cipher"
 	"github.com/huaan/insurance-bridge/internal/pkg/pii"
 	rediscache "github.com/huaan/insurance-bridge/internal/pkg/redis"
@@ -28,7 +27,6 @@ type ProxyService struct {
 	cfg           *config.Config
 	log           *zap.Logger
 	channels      *repository.ChannelRepo // 渠道密钥查询
-	logs          *repository.LogRepo       // 接口审计日志
 	banks         *repository.BankRepo      // 银行信息表
 	extractor     *Extractor                // 从华安响应抽取业务实体
 	pii           *pii.Transformer          // 三要素加解密
@@ -41,7 +39,6 @@ func NewProxyService(
 	cfg *config.Config,
 	log *zap.Logger,
 	channels *repository.ChannelRepo,
-	logs *repository.LogRepo,
 	banks *repository.BankRepo,
 	extractor *Extractor,
 	piiTransformer *pii.Transformer,
@@ -51,7 +48,6 @@ func NewProxyService(
 		cfg:           cfg,
 		log:           log,
 		channels:      channels,
-		logs:          logs,
 		banks:         banks,
 		extractor:     extractor,
 		pii:           piiTransformer,
@@ -64,7 +60,7 @@ func NewProxyService(
 
 // Forward 处理单次渠道 API 调用。
 // 约定：HTTP 状态码恒为 200，业务成败由 JSON body 的 code 字段表达（与华安/渠道文档一致）。
-// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 替换华安 key 并重签 → POST 上游 → 抽取落库 → 加密响应字段 → 写审计日志。
+// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 替换华安 key 并重签 → POST 上游 → 抽取落库 → 加密响应字段 → 写服务日志。
 func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []byte) ([]byte, int, error) {
 	traceID := uuid.New().String()
 	var body map[string]interface{}
@@ -127,7 +123,7 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 	resp, err := s.httpClient.Do(req)
 	duration := time.Since(start).Milliseconds()
 	if err != nil {
-		s.saveLog(traceID, channelCode, apiPath, string(rawBody), "", 0, duration, err.Error())
+		s.logAPICall(traceID, channelCode, apiPath, string(rawBody), "", 0, duration, "upstream", err.Error())
 		if ctx.Err() != nil {
 			return s.errorResponse(504, "upstream timeout"), http.StatusOK, nil
 		}
@@ -158,16 +154,7 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 	_ = s.pii.EncryptResponse(respBody)
 	out, _ := json.Marshal(respBody)
 
-	// 请求侧存脱敏副本，响应侧存华安原始 JSON
-	s.saveLog(traceID, channelCode, apiPath, maskLogBody(channelBody), string(respBytes), huaanCode, duration, "")
-
-	s.log.Info("proxy done",
-		zap.String("traceId", traceID),
-		zap.String("channelCode", channelCode),
-		zap.String("apiPath", apiPath),
-		zap.Int("huaanCode", huaanCode),
-		zap.Int64("durationMs", duration),
-	)
+	s.logAPICall(traceID, channelCode, apiPath, maskLogBody(channelBody), string(respBytes), huaanCode, duration, "upstream", "")
 
 	return out, http.StatusOK, nil
 }
@@ -206,7 +193,7 @@ func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKe
 	resp, err := s.httpClient.Do(req)
 	duration := time.Since(start).Milliseconds()
 	if err != nil {
-		s.saveLog(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), "", 0, duration, err.Error())
+		s.logAPICall(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), "", 0, duration, "admin-upstream", err.Error())
 		if ctx.Err() != nil {
 			return nil, errors.New("upstream timeout")
 		}
@@ -226,16 +213,9 @@ func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKe
 		huaanCode = int(c)
 	}
 
-	s.saveLog(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), string(respBytes), huaanCode, duration, "")
+	s.logAPICall(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), string(respBytes), huaanCode, duration, "admin-upstream", "")
 
 	s.cacheBankList(ctx, channelCode, respBytes)
-
-	s.log.Info("admin bank list refresh",
-		zap.String("traceId", traceID),
-		zap.String("channelCode", channelCode),
-		zap.Int("huaanCode", huaanCode),
-		zap.Int64("durationMs", duration),
-	)
 
 	return respBytes, nil
 }
@@ -291,16 +271,11 @@ func (s *ProxyService) respondBankListFromDB(ctx context.Context, traceID, chann
 	_ = s.pii.EncryptResponse(respBody)
 	out, _ := json.Marshal(respBody)
 
-	s.saveLog(traceID, channelCode, bankListAPIPath, reqLog, string(raw), 200, 0, "db hit")
-	s.log.Info("bank list db hit",
-		zap.String("traceId", traceID),
-		zap.String("channelCode", channelCode),
-		zap.Int("count", len(banks)),
-	)
+	s.logAPICall(traceID, channelCode, bankListAPIPath, reqLog, string(raw), 200, 0, "db", "")
 	return out, true
 }
 
-// respondBankListFromCache 命中缓存时构造渠道响应并写审计日志。
+// respondBankListFromCache 命中缓存时构造渠道响应并写服务日志。
 func (s *ProxyService) respondBankListFromCache(ctx context.Context, traceID, channelCode, reqLog string) ([]byte, bool) {
 	cached, err := s.bankListCache.Get(ctx, channelCode)
 	if err != nil {
@@ -326,12 +301,7 @@ func (s *ProxyService) respondBankListFromCache(ctx context.Context, traceID, ch
 	_ = s.pii.EncryptResponse(respBody)
 	out, _ := json.Marshal(respBody)
 
-	s.saveLog(traceID, channelCode, bankListAPIPath, reqLog, string(cached), huaanCode, 0, "cache hit")
-	s.log.Info("bank list cache hit",
-		zap.String("traceId", traceID),
-		zap.String("channelCode", channelCode),
-		zap.Int("huaanCode", huaanCode),
-	)
+	s.logAPICall(traceID, channelCode, bankListAPIPath, reqLog, string(cached), huaanCode, 0, "cache", "")
 	return out, true
 }
 
@@ -354,18 +324,28 @@ func maskAdminLogBody(m map[string]interface{}) string {
 	return string(b)
 }
 
-// saveLog 写入 api_request_logs，错误被忽略以免阻塞主链路。
-func (s *ProxyService) saveLog(traceID, channelCode, apiPath, req, resp string, code int, duration int64, errMsg string) {
-	_ = s.logs.Create(&model.APIRequestLog{
-		TraceID:      traceID,
-		ChannelCode:  channelCode,
-		APIPath:      apiPath,
-		RequestBody:  req,
-		ResponseBody: resp,
-		HuaAnCode:    code,
-		DurationMS:   duration,
-		ErrorMessage: errMsg,
-	})
+// logAPICall 将渠道 API 调用详情写入服务日志；摘要 info，请求/响应 debug。
+func (s *ProxyService) logAPICall(traceID, channelCode, apiPath, req, resp string, code int, duration int64, source, errMsg string) {
+	fields := []zap.Field{
+		zap.String("traceId", traceID),
+		zap.String("channelCode", channelCode),
+		zap.String("apiPath", apiPath),
+		zap.Int("huaanCode", code),
+		zap.Int64("durationMs", duration),
+		zap.String("source", source),
+	}
+	if errMsg != "" {
+		fields = append(fields, zap.String("error", errMsg))
+	}
+	s.log.Info("api call", fields...)
+	s.log.Debug("api call detail",
+		zap.String("traceId", traceID),
+		zap.String("channelCode", channelCode),
+		zap.String("apiPath", apiPath),
+		zap.String("source", source),
+		zap.String("request", req),
+		zap.String("response", resp),
+	)
 }
 
 // errorResponse 构造桥接层错误 JSON（code/message/data），供渠道解析。
