@@ -8,7 +8,7 @@
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
 - **数据落库**：接口日志、用户、保单、签约、产品、付费流水
-- **管理后台**：`/admin/` Web 界面 + `/admin/api` REST（银行列表刷新与 Redis 缓存）
+- **管理后台**：Vue 3 + Element Plus（`web/admin/`），Nginx 托管 `/admin/`，REST API 在 `/admin/api`
 - **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化日志、90 天日志清理与归档
 
 ## 快速启动
@@ -40,7 +40,7 @@ cp config/config.yaml.example config/config.yaml
 ```
 
 - 渠道 API：`http://localhost:5051/upChannelApi/...`
-- 管理后台：`http://localhost:5051/admin/`
+- 管理后台：`http://localhost:5051/admin/`（Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发，API 代理至 Go）
 - 默认管理员：见 `config/config.yaml` 中 `admin` 段（首次启动自动创建）
 - OpenAPI：`http://localhost:5051/openapi.yaml`
 
@@ -68,19 +68,29 @@ cp config/config.yaml.example config/config.yaml
 
 ## 本地开发
 
-**环境要求：Go 1.24 及以上**（`go.mod` 已声明；引入 go-redis 后需 1.24+）。
+**环境要求：Go 1.24+**；管理后台前端另需 **Node.js 18+**。
 
 ```bash
 go version   # 确认 >= go1.24
 go mod tidy
 go test ./...
+
+# 后端（默认 :8080）
 go run ./cmd/server
+
+# 管理后台前端（:5173，/admin/api 代理至后端）
+cd web/admin && npm install && npm run dev
 ```
+
+本地跨域开发时，在 `config/config.yaml` 设置 `admin.cors_origins: "http://localhost:5173"`，或环境变量 `BRIDGE_ADMIN_CORS_ORIGINS=http://localhost:5173`。
+
+生产构建：`bash scripts/build-admin.sh` 或 `cd web/admin && npm run build`。
 
 ## 项目结构
 
 ```
-cmd/server/          # 主程序与管理后台静态资源
+cmd/server/          # Go 主程序
+web/admin/           # 管理后台 Vue 前端（Element Plus）
 internal/
   handler/           # HTTP 处理器
   service/           # 代理、抽取、管理服务
@@ -88,7 +98,7 @@ internal/
   model/             # 数据模型
   pkg/sign,cipher,pii,redis
 api/openapi.yaml
-deploy/nginx/        # Nginx 反向代理配置
+deploy/nginx/        # Nginx：/admin/ 静态 + API 反代
 docker-compose.yml
 ```
 
@@ -103,4 +113,3 @@ docker-compose.yml
 | sign_records | 签约 |
 | product_records | 产品 |
 | payment_records | 价格/付费流水 |
-# insurance

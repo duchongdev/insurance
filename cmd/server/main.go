@@ -1,14 +1,12 @@
 // 华安保险渠道对接服务入口。
 //
 // 启动流程：加载配置 → 初始化日志/加密/数据库 → Seed 默认管理员 → 组装代理与管理服务 →
-// 注册路由（渠道 API、管理 API、健康检查、静态后台）→ 启动日志清理定时任务 → 优雅关闭。
+// 注册路由（渠道 API、管理 API、健康检查）→ 启动日志清理定时任务 → 优雅关闭。
 package main
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,11 +27,6 @@ import (
 	"github.com/huaan/insurance-bridge/internal/service"
 	"go.uber.org/zap"
 )
-
-// adminFS 内嵌管理后台静态资源（web/admin），通过 /admin 路径对外提供。
-//
-//go:embed all:web/admin
-var adminFS embed.FS
 
 func main() {
 	// --- 配置与基础设施 ---
@@ -88,7 +81,7 @@ func main() {
 	// --- HTTP 路由 ---
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
-	r.Use(gin.Recovery(), middleware.Trace())
+	r.Use(gin.Recovery(), middleware.Trace(), middleware.CORS(cfg.Admin.CorsOrigins))
 
 	health := handler.NewHealthHandler(db, rdb)
 	r.GET("/health/live", health.Live)
@@ -101,17 +94,12 @@ func main() {
 	adminHandler := handler.NewAdminHandler(adminSvc, proxySvc)
 	adminHandler.Register(r.Group("/admin/api"))
 
-	// 仅内嵌 index.html；不用 StaticFS("/admin")，避免与 /admin/api 路由冲突
-	adminSub, _ := fs.Sub(adminFS, "web/admin")
-	r.GET("/admin", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/admin/")
-	})
-	r.GET("/admin/", func(c *gin.Context) {
-		// 不用 FileFromFS：对 index.html 会 301 到 ./，与 /admin/ 路由形成无限重定向
-		http.ServeFileFS(c.Writer, c.Request, adminSub, "index.html")
-	})
 	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/admin/")
+		c.JSON(http.StatusOK, gin.H{
+			"service": "insurance-bridge",
+			"admin":   "/admin/",
+			"health":  "/health/ready",
+		})
 	})
 	r.StaticFile("/openapi.yaml", "api/openapi.yaml")
 

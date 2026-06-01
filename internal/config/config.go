@@ -61,10 +61,11 @@ type LogConfig struct {
 	ArchiveEnabled bool   // 是否归档过期的文件日志
 }
 
-// AdminConfig 首次启动无管理员时创建的默认账号（生产环境务必修改）。
+// AdminConfig 管理后台：默认账号（Seed）与开发期 CORS。
 type AdminConfig struct {
 	DefaultUsername string
 	DefaultPassword string
+	CorsOrigins     []string // 非空时对匹配 Origin 启用 CORS（如 http://localhost:5173）
 }
 
 // Load 从指定路径加载配置；文件不存在时使用默认值，环境变量 BRIDGE_* 可覆盖任意项。
@@ -116,6 +117,7 @@ func Load(path string) (*Config, error) {
 		Admin: AdminConfig{
 			DefaultUsername: v.GetString("admin.default_username"),
 			DefaultPassword: v.GetString("admin.default_password"),
+			CorsOrigins:     parseStringList(v.GetString("admin.cors_origins")),
 		},
 	}
 	return cfg, nil
@@ -140,4 +142,20 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("log.archive_enabled", true)
 	v.SetDefault("admin.default_username", "admin")
 	v.SetDefault("admin.default_password", "admin123")
+}
+
+// parseStringList 解析逗号分隔的配置项为字符串切片。
+func parseStringList(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

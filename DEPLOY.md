@@ -167,7 +167,7 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 └── logs/                     # 应用日志目录
 ```
 ---
-## 一键安装 Docker
+## 一键安装 Docker 24.0.9（24.0.x 最新稳定小版本）
 ```
 # 卸载旧版本（如果有）
 yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
@@ -188,7 +188,7 @@ systemctl enable docker
 # 验证安装
 docker --version 
 ```
-##  一键安装 Docker Compose（最新版）
+##  一键安装 Docker Compose V2 2.24.5（和 Docker 24.0.x 最兼容、企业用得最多）。docker compose up -d（无横线）。
 ```
 # 下载 Docker Compose 最新稳定版
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose

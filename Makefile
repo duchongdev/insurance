@@ -1,7 +1,13 @@
-.PHONY: tidy test build run package install start stop deploy-test
+.PHONY: tidy test build run package install start stop deploy-test admin-build admin-dev
 
 GOPROXY ?= https://goproxy.io,direct
 GOSUMDB ?= sum.golang.org
+
+admin-build:
+	bash scripts/build-admin.sh
+
+admin-dev:
+	cd web/admin && npm run dev
 
 tidy:
 	GOPROXY=$(GOPROXY) GOSUMDB=$(GOSUMDB) go mod tidy

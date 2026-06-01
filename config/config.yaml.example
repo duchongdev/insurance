@@ -40,3 +40,5 @@ admin:
   default_username: admin
   # 首次启动无管理员时创建；登录后请尽快修改密码
   default_password: 请修改默认管理员密码
+  # 开发期 Vue 本地 dev server 跨域，逗号分隔；生产 Nginx 同源部署留空
+  cors_origins: ""

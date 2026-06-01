@@ -13,6 +13,9 @@ ARCHIVE="${OUT_DIR}/${NAME}.tar.gz"
 
 mkdir -p "$OUT_DIR"
 
+echo "[package] 构建管理后台 ..."
+bash scripts/build-admin.sh
+
 echo "[package] 生成交付包: ${ARCHIVE}"
 
 # macOS：不打包扩展属性 / 资源分叉，避免 ._xxx 等垃圾文件
@@ -32,7 +35,8 @@ tar -czf "$ARCHIVE" \
   --exclude='*.log' \
   --exclude='bin' \
   --exclude='bridge' \
-  --exclude='dist' \
+  --exclude='./dist' \
+  --exclude='./web/admin/node_modules' \
   --exclude='.env' \
   --exclude='config/config.yaml' \
   --exclude='.DS_Store' \
