@@ -8,8 +8,8 @@
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
 - **数据落库**：接口日志、用户、保单、签约、产品、付费流水
-- **管理后台**：`/admin/` Web 界面 + `/admin/api` REST
-- **运维**：健康检查、JSON 结构化日志、90 天日志清理与归档
+- **管理后台**：`/admin/` Web 界面 + `/admin/api` REST（银行列表刷新与 Redis 缓存）
+- **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化日志、90 天日志清理与归档
 
 ## 快速启动
 
@@ -51,10 +51,8 @@ cp config/config.yaml.example config/config.yaml
 | 变量 | 说明 |
 |------|------|
 | `BRIDGE_DATABASE_DSN` | MySQL/MariaDB 连接串 |
-
-| 变量 | 说明 |
-|------|------|
-| `BRIDGE_DATABASE_DSN` | MySQL/MariaDB 连接串 |
+| `BRIDGE_REDIS_PASSWORD` | Redis 认证密码（Docker 部署由 `REDIS_PASSWORD` 自动同步） |
+| `BRIDGE_REDIS_BANK_LIST_TTL` | 银行列表缓存 TTL，默认 `0`（不过期） |
 | `BRIDGE_HUAAN_BASE_URL` | 华安域名 |
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，三要素与库内敏感字段 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT |
@@ -70,10 +68,10 @@ cp config/config.yaml.example config/config.yaml
 
 ## 本地开发
 
-**环境要求：Go 1.22 及以上**（`go.mod` 已声明；低于 1.22 时 `go mod tidy` 会报 `log/slog`、`slices` 不在 GOROOT）。
+**环境要求：Go 1.24 及以上**（`go.mod` 已声明；引入 go-redis 后需 1.24+）。
 
 ```bash
-go version   # 确认 >= go1.22
+go version   # 确认 >= go1.24
 go mod tidy
 go test ./...
 go run ./cmd/server
@@ -88,8 +86,9 @@ internal/
   service/           # 代理、抽取、管理服务
   repository/        # 数据访问
   model/             # 数据模型
-  pkg/sign,cipher,pii
+  pkg/sign,cipher,pii,redis
 api/openapi.yaml
+deploy/nginx/        # Nginx 反向代理配置
 docker-compose.yml
 ```
 

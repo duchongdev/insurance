@@ -43,6 +43,8 @@ mkdir -p logs
 
 bash scripts/sync-dsn.sh
 info "已根据 MYSQL_* 写入 BRIDGE_DATABASE_DSN"
+bash scripts/sync-redis.sh
+info "已根据 REDIS_PASSWORD 写入 BRIDGE_REDIS_PASSWORD"
 
 # ---------- 基本校验 ----------
 check_placeholder() {
@@ -58,6 +60,7 @@ NEED_EDIT=0
 source .env
 check_placeholder ".env" "${MYSQL_ROOT_PASSWORD:-}" "MYSQL_ROOT_PASSWORD"
 check_placeholder ".env" "${MYSQL_PASSWORD:-}" "MYSQL_PASSWORD"
+check_placeholder ".env" "${REDIS_PASSWORD:-}" "REDIS_PASSWORD"
 check_placeholder ".env" "${BRIDGE_SECURITY_DATA_ENCRYPTION_KEY:-}" "BRIDGE_SECURITY_DATA_ENCRYPTION_KEY"
 check_placeholder ".env" "${BRIDGE_SECURITY_JWT_SECRET:-}" "BRIDGE_SECURITY_JWT_SECRET"
 check_placeholder ".env" "${BRIDGE_ADMIN_DEFAULT_PASSWORD:-}" "BRIDGE_ADMIN_DEFAULT_PASSWORD"

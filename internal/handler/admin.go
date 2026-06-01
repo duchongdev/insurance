@@ -12,11 +12,12 @@ import (
 // AdminHandler 管理后台 REST API：登录、渠道 CRUD、审计日志与业务数据分页查询。
 type AdminHandler struct {
 	admin *service.AdminService
+	proxy *service.ProxyService
 }
 
 // NewAdminHandler 构造管理后台处理器。
-func NewAdminHandler(admin *service.AdminService) *AdminHandler {
-	return &AdminHandler{admin: admin}
+func NewAdminHandler(admin *service.AdminService, proxy *service.ProxyService) *AdminHandler {
+	return &AdminHandler{admin: admin, proxy: proxy}
 }
 
 // Register 在 /admin/api 路由组下注册所有管理接口；除 login 外均需 Bearer JWT。
@@ -33,6 +34,8 @@ func (h *AdminHandler) Register(r *gin.RouterGroup) {
 	auth.GET("/policies", h.listPolicies)
 	auth.GET("/users", h.listUsers)
 	auth.GET("/signs", h.listSigns)
+	auth.POST("/bank-list/refresh", h.refreshBankList)
+	auth.GET("/bank-list", h.getBankList)
 }
 
 // authMiddleware 从 Authorization: Bearer <token> 解析 JWT，失败返回 401。
@@ -166,6 +169,47 @@ func (h *AdminHandler) listUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
+}
+
+// refreshBankList 使用指定渠道码与华安密钥请求上游 getBankList。
+func (h *AdminHandler) refreshBankList(c *gin.Context) {
+	var req struct {
+		ChannelCode string `json:"channelCode"`
+		HuaAnKey    string `json:"huaAnKey"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
+		return
+	}
+	if req.ChannelCode == "" || req.HuaAnKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "channelCode and huaAnKey required"})
+		return
+	}
+	out, err := h.proxy.RefreshBankList(c.Request.Context(), req.ChannelCode, req.HuaAnKey)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"message": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", out)
+}
+
+// getBankList 读取 Redis 中已缓存的银行列表（华安原始 JSON）。
+func (h *AdminHandler) getBankList(c *gin.Context) {
+	channelCode := c.Query("channelCode")
+	if channelCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "channelCode required"})
+		return
+	}
+	data, err := h.proxy.GetCachedBankList(c.Request.Context(), channelCode)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	if len(data) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"message": "bank list not cached"})
+		return
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", data)
 }
 
 // listSigns 分页查询签约记录。

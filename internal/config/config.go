@@ -13,6 +13,7 @@ type Config struct {
 	Server   ServerConfig   // HTTP 服务与超时
 	HuaAn    HuaAnConfig    // 华安上游地址
 	Database DatabaseConfig // MySQL 连接
+	Redis    RedisConfig    // Redis 连接
 	Security SecurityConfig // 加密与 JWT
 	Log      LogConfig      // 日志与清理策略
 	Admin    AdminConfig    // 默认管理员（仅首次 seed 使用）
@@ -36,6 +37,14 @@ type HuaAnConfig struct {
 // DatabaseConfig 数据库连接。
 type DatabaseConfig struct {
 	DSN string // MySQL DSN
+}
+
+// RedisConfig Redis 连接参数。
+type RedisConfig struct {
+	Addr        string        // 地址，Docker 内默认 redis:6379
+	Password    string        // 认证密码
+	DB          int           // 库编号，默认 0
+	BankListTTL time.Duration // 银行列表缓存 TTL，0 表示不过期
 }
 
 // SecurityConfig 安全相关密钥。
@@ -88,6 +97,12 @@ func Load(path string) (*Config, error) {
 		Database: DatabaseConfig{
 			DSN: v.GetString("database.dsn"),
 		},
+		Redis: RedisConfig{
+			Addr:        v.GetString("redis.addr"),
+			Password:    v.GetString("redis.password"),
+			DB:          v.GetInt("redis.db"),
+			BankListTTL: v.GetDuration("redis.bank_list_ttl"),
+		},
 		Security: SecurityConfig{
 			DataEncryptionKey: v.GetString("security.data_encryption_key"),
 			JWTSecret:         v.GetString("security.jwt_secret"),
@@ -116,6 +131,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("huaan.base_url", "https://xx.xxx.api.york.xin")
 	v.SetDefault("huaan.api_path", "/upChannelApi")
 	v.SetDefault("database.dsn", "bridge:bridge123@tcp(mysql:3306)/insurance_bridge?charset=utf8mb4&parseTime=True&loc=Local")
+	v.SetDefault("redis.addr", "redis:6379")
+	v.SetDefault("redis.db", 0)
+	v.SetDefault("redis.bank_list_ttl", "0")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.file_path", "./logs/app.log")
 	v.SetDefault("log.retention_days", 90)

@@ -23,6 +23,7 @@ fi
 
 mkdir -p logs
 bash scripts/sync-dsn.sh
+bash scripts/sync-redis.sh
 
 export DOCKER_API_VERSION="${DOCKER_API_VERSION:-1.43}"
 
@@ -48,5 +49,5 @@ echo
 echo "[start] 启动完成"
 echo "  管理后台: http://<服务器IP>:${APP_PORT}/admin/"
 echo "  健康检查: http://<服务器IP>:${APP_PORT}/health/ready"
-echo "  查看日志: $COMPOSE logs -f bridge"
+echo "  查看日志: $COMPOSE logs -f nginx bridge"
 echo "  停止服务: ./scripts/stop.sh"

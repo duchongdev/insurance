@@ -16,10 +16,12 @@ paths:
           description: ok
   /health/ready:
     get:
-      summary: 就绪探针（含数据库）
+      summary: 就绪探针（含数据库与 Redis）
       responses:
         '200':
           description: ok
+        '503':
+          description: 依赖不可用
   /upChannelApi/proInsurance:
     post:
       tags: [渠道接口]
@@ -130,6 +132,49 @@ paths:
       tags: [管理后台]
       security: [{ bearerAuth: [] }]
       summary: 统计概览
+  /admin/api/bank-list:
+    get:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 读取 Redis 中已缓存的银行列表
+      parameters:
+        - in: query
+          name: channelCode
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 华安 getBankList 原始响应（来自 Redis）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: 该渠道尚无缓存
+  /admin/api/bank-list/refresh:
+    post:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 手动请求华安刷新银行列表并写入 Redis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channelCode, huaAnKey]
+              properties:
+                channelCode: { type: string, description: 渠道编码 }
+                huaAnKey: { type: string, description: 华安签名密钥 }
+      responses:
+        '200':
+          description: 华安 getBankList 原始响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '502':
+          description: 华安不可达或超时
 components:
   securitySchemes:
     bearerAuth:

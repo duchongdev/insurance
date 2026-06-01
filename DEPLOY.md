@@ -10,7 +10,7 @@
 | Docker | 20.10+ |
 | Docker Compose | v2（`docker compose`）或 v1（`docker-compose`） |
 | 网络 | 首次构建需访问外网拉取基础镜像与 Go 依赖 |
-| 端口 | 默认占用 **5051**（可在 `.env` 修改 `APP_PORT`） |
+| 端口 | 默认占用 **5051**（Nginx 反向代理，可在 `.env` 修改 `APP_PORT`） |
 
 验证 Docker：
 
@@ -55,17 +55,20 @@ chmod +x scripts/*.sh
 | `MYSQL_USER` | 应用数据库用户名（默认 `bridge`） |
 | `MYSQL_PASSWORD` | 应用数据库用户密码 |
 | `MYSQL_DATABASE` | 数据库名（默认 `insurance_bridge`） |
+| `REDIS_PASSWORD` | Redis 认证密码 |
 | `BRIDGE_HUAAN_BASE_URL` | 华安上游域名 |
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | **32 字节**加密密钥 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT 密钥 |
 | `BRIDGE_ADMIN_DEFAULT_PASSWORD` | 首次创建的管理员密码 |
-| `APP_PORT` | 对外端口，默认 5051 |
+| `APP_PORT` | Nginx 对外端口，默认 5051 |
 
 编辑 **`config/config.yaml`**（可与 `.env` 保持一致，尤其 `huaan.base_url`、`security` 段）。
 
 `BRIDGE_DATABASE_DSN` **无需手动填写**；`install.sh` / `start.sh` 会根据 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE` 自动生成。
 
-修改 MySQL 账号或密码后，执行 `./scripts/install.sh` 或 `./scripts/start.sh` 即可重新同步 DSN。
+`BRIDGE_REDIS_PASSWORD` **无需手动填写**；`install.sh` / `start.sh` 会根据 `REDIS_PASSWORD` 自动生成。
+
+修改 MySQL 或 Redis 密码后，执行 `./scripts/install.sh` 或 `./scripts/start.sh` 即可重新同步。
 
 ### 4. 启动服务
 
@@ -87,6 +90,9 @@ curl http://127.0.0.1:5051/health/ready
 
 # 应用日志
 docker compose logs -f bridge
+
+# Nginx 访问/错误日志
+docker compose logs -f nginx
 ```
 
 浏览器访问：
@@ -102,8 +108,10 @@ docker compose logs -f bridge
 ./scripts/stop.sh              # 停止服务（保留数据库数据）
 ./scripts/start.sh             # 启动/更新后重启
 docker compose logs -f bridge  # 查看应用日志
+docker compose logs -f nginx   # 查看 Nginx 日志
 docker compose logs -f mysql   # 查看数据库日志
-docker compose down -v         # 停止并删除数据卷（清空数据库，慎用）
+docker compose logs -f redis   # 查看 Redis 日志
+docker compose down -v         # 停止并删除数据卷（清空数据库与 Redis，慎用）
 ```
 
 ## 更新版本
@@ -117,8 +125,8 @@ docker compose down -v         # 停止并删除数据卷（清空数据库，�
 ## 安全建议
 
 - 不要将 `.env` 或含真实密钥的 `config/config.yaml` 外传或提交到 Git
-- 生产环境在防火墙仅开放 `APP_PORT`；数据库默认不映射到宿主机端口
-- 建议在 Nginx 等反向代理后配置 HTTPS
+- 生产环境在防火墙仅开放 `APP_PORT`（Nginx）；应用与数据库默认不映射到宿主机端口
+- 可在 `deploy/nginx/conf.d/bridge.conf` 中调整反向代理参数；生产环境建议在 Nginx 前或之上配置 HTTPS
 - 定期备份 Docker 卷 `mysql_data` 或导出 MySQL 数据
 
 ## 故障排查
@@ -126,16 +134,17 @@ docker compose down -v         # 停止并删除数据卷（清空数据库，�
 | 现象 | 处理 |
 |------|------|
 | `请在 .env 中设置 MYSQL_ROOT_PASSWORD` | 未创建或未编辑 `.env`，执行 `./scripts/install.sh` |
-| `ready` 探针失败 | 数据库未就绪，执行 `docker compose logs mysql` |
+| `ready` 探针失败 | 数据库或 Redis 未就绪，执行 `docker compose logs mysql` / `docker compose logs redis` |
 | 构建失败 / 无法拉镜像 | 检查服务器网络与 Docker 镜像源 |
-| 5051 无法访问 | 检查防火墙、`APP_PORT`、容器是否运行 |
+| 5051 无法访问 | 检查防火墙、`APP_PORT`、Nginx 与 bridge 容器是否运行 |
 
 ## 目录说明
 
 ```
 .
 ├── DEPLOY.md                 # 本文件
-├── docker-compose.yml        # 编排 MySQL + 应用
+├── docker-compose.yml        # 编排 MySQL + Redis + 应用 + Nginx
+├── deploy/nginx/             # Nginx 反向代理配置
 ├── Dockerfile                # 应用镜像构建
 ├── .env.example              # 环境变量模板
 ├── config/
@@ -145,6 +154,7 @@ docker compose down -v         # 停止并删除数据卷（清空数据库，�
 │   ├── install.sh            # 初始化配置
 │   ├── start.sh              # 构建并启动
 │   ├── stop.sh               # 停止
+│   ├── sync-redis.sh         # 同步 Redis 密码到 BRIDGE_REDIS_PASSWORD
 │   └── package.sh            # 交付方打包容器（开发用）
 └── logs/                     # 应用日志目录
 ```

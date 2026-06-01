@@ -24,6 +24,7 @@ import (
 	"github.com/huaan/insurance-bridge/internal/pkg/cipher"
 	"github.com/huaan/insurance-bridge/internal/pkg/logger"
 	"github.com/huaan/insurance-bridge/internal/pkg/pii"
+	redisclient "github.com/huaan/insurance-bridge/internal/pkg/redis"
 	"github.com/huaan/insurance-bridge/internal/repository"
 	"github.com/huaan/insurance-bridge/internal/service"
 	"go.uber.org/zap"
@@ -61,6 +62,12 @@ func main() {
 		log.Fatal("db connect failed", zap.Error(err))
 	}
 
+	rdb, err := redisclient.New(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		log.Fatal("redis connect failed", zap.Error(err))
+	}
+	defer rdb.Close()
+
 	// --- 仓储与首次启动 Seed ---
 	channelRepo := repository.NewChannelRepo(db)
 	logRepo := repository.NewLogRepo(db)
@@ -74,7 +81,8 @@ func main() {
 	// --- 业务服务 ---
 	extractor := service.NewExtractor(bizRepo, crypter)
 	piiTransformer := pii.NewTransformer(crypter)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, extractor, piiTransformer)
+	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, extractor, piiTransformer, bankListCache)
 	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, logRepo, cfg.Security.JWTSecret)
 
 	// --- HTTP 路由 ---
@@ -82,7 +90,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery(), middleware.Trace())
 
-	health := handler.NewHealthHandler(db)
+	health := handler.NewHealthHandler(db, rdb)
 	r.GET("/health/live", health.Live)
 	r.GET("/health/ready", health.Ready)
 
@@ -90,7 +98,7 @@ func main() {
 	api := r.Group(cfg.HuaAn.APIPath)
 	channelHandler.Register(api)
 
-	adminHandler := handler.NewAdminHandler(adminSvc)
+	adminHandler := handler.NewAdminHandler(adminSvc, proxySvc)
 	adminHandler.Register(r.Group("/admin/api"))
 
 	// 仅内嵌 index.html；不用 StaticFS("/admin")，避免与 /admin/api 路由冲突

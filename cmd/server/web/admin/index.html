@@ -23,14 +23,18 @@
     .hidden { display: none; }
     .tabs button { margin-right: 8px; }
     .tabs button.active { background: #1d4ed8; }
+    pre.result { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; overflow: auto; max-height: 480px; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+    label.field { display: block; margin: 8px 0 4px; font-size: 14px; }
+    label.field input { width: 100%; max-width: 480px; }
   </style>
 </head>
 <body>
   <div id="loginView" class="card">
     <h2>管理员登录</h2>
-    <div><input id="username" placeholder="用户名" value="admin" /></div>
-    <div><input id="password" type="password" placeholder="密码" value="admin123" /></div>
+    <div><input id="username" placeholder="用户名" autocomplete="username" /></div>
+    <div><input id="password" type="password" placeholder="密码" autocomplete="current-password" /></div>
     <button onclick="login()">登录</button>
+    <p style="color:#6b7280;font-size:13px;margin-top:8px">首次部署账号见 config/config.yaml 中 admin 段（仅表为空时自动创建）。</p>
     <p id="loginErr" style="color:#dc2626"></p>
   </div>
 
@@ -46,6 +50,7 @@
         <button onclick="switchTab('policies')">保单</button>
         <button onclick="switchTab('users')">用户</button>
         <button onclick="switchTab('signs')">签约</button>
+        <button onclick="switchTab('banks')">银行列表</button>
         <button onclick="switchTab('logs')">接口日志</button>
       </div>
       <div class="card" id="panel"></div>
@@ -101,13 +106,14 @@ async function loadStats() {
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tabs button').forEach((b,i) => {
-    const tabs = ['channels','policies','users','signs','logs'];
+    const tabs = ['channels','policies','users','signs','banks','logs'];
     b.classList.toggle('active', tabs[i]===tab);
   });
   if (tab==='channels') renderChannels();
   if (tab==='policies') renderList('/policies', ['policyId','channelCode','policyStatus','productCode']);
   if (tab==='users') renderList('/users', ['userId','channelCode']);
   if (tab==='signs') renderList('/signs', ['signId','policyId','channelCode']);
+  if (tab==='banks') renderBankList();
   if (tab==='logs') renderList('/logs', ['traceId','channelCode','apiPath','huaanCode','durationMS']);
 }
 
@@ -150,6 +156,69 @@ async function delChannel(id) {
   if (!confirm('确认删除?')) return;
   await fetch(API + '/channels/' + id, { method: 'DELETE', headers: headers() });
   renderChannels();
+}
+
+function renderBankList() {
+  panel.innerHTML = `<h2>银行列表</h2>
+    <p style="color:#6b7280;font-size:14px">手动请求华安刷新银行列表并写入 Redis；渠道 getBankList 优先读缓存。</p>
+    <label class="field">渠道码
+      <input id="bank_channel" value="I8p0Wn" />
+    </label>
+    <label class="field">华安密钥
+      <input id="bank_key" value="d158da0dbddf4bec8d4f703fcd6a82cb" />
+    </label>
+    <div>
+      <button onclick="loadBankListCache()">查看缓存</button>
+      <button onclick="refreshBankList()">刷新并缓存</button>
+    </div>
+    <p id="bankErr" style="color:#dc2626"></p>
+    <pre id="bankResult" class="result hidden"></pre>`;
+  loadBankListCache();
+}
+
+async function loadBankListCache() {
+  bankErr.textContent = '';
+  bankResult.classList.add('hidden');
+  const code = bank_channel.value.trim();
+  if (!code) return;
+  const res = await fetch(API + '/bank-list?channelCode=' + encodeURIComponent(code), { headers: headers() });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+  if (res.status === 404) {
+    bankErr.textContent = '暂无缓存，请点击「刷新并缓存」';
+    return;
+  }
+  if (!res.ok) {
+    bankErr.textContent = (data && data.message) || text || '加载失败';
+    return;
+  }
+  bankResult.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  bankResult.classList.remove('hidden');
+}
+
+async function refreshBankList() {
+  bankErr.textContent = '';
+  bankResult.classList.add('hidden');
+  bankResult.textContent = '请求中...';
+  bankResult.classList.remove('hidden');
+  const res = await fetch(API + '/bank-list/refresh', {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      channelCode: bank_channel.value.trim(),
+      huaAnKey: bank_key.value.trim()
+    })
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = text; }
+  if (!res.ok) {
+    bankResult.classList.add('hidden');
+    bankErr.textContent = (data && data.message) || text || '请求失败';
+    return;
+  }
+  bankResult.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
 }
 
 async function renderList(path, cols) {

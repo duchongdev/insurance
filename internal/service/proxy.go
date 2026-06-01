@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
-	"strings"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +17,7 @@ import (
 	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/pkg/cipher"
 	"github.com/huaan/insurance-bridge/internal/pkg/pii"
+	rediscache "github.com/huaan/insurance-bridge/internal/pkg/redis"
 	"github.com/huaan/insurance-bridge/internal/pkg/sign"
 	"github.com/huaan/insurance-bridge/internal/repository"
 	"go.uber.org/zap"
@@ -22,13 +25,14 @@ import (
 
 // ProxyService 渠道 API 代理核心：验签 → 解密三要素 → 换华安 key 重签 → 转发 → 抽取业务 → 加密响应 → 落审计日志。
 type ProxyService struct {
-	cfg        *config.Config
-	log        *zap.Logger
-	channels   *repository.ChannelRepo // 渠道密钥查询
-	logs       *repository.LogRepo       // 接口审计日志
-	extractor  *Extractor                // 从华安响应抽取业务实体
-	pii        *pii.Transformer          // 三要素加解密
-	httpClient *http.Client              // 调用华安上游
+	cfg           *config.Config
+	log           *zap.Logger
+	channels      *repository.ChannelRepo // 渠道密钥查询
+	logs          *repository.LogRepo       // 接口审计日志
+	extractor     *Extractor                // 从华安响应抽取业务实体
+	pii           *pii.Transformer          // 三要素加解密
+	bankListCache *rediscache.BankListCache // 银行列表 Redis 缓存
+	httpClient    *http.Client              // 调用华安上游
 }
 
 // NewProxyService 构造代理服务，httpClient 超时取自配置 upstream_timeout。
@@ -39,14 +43,16 @@ func NewProxyService(
 	logs *repository.LogRepo,
 	extractor *Extractor,
 	piiTransformer *pii.Transformer,
+	bankListCache *rediscache.BankListCache,
 ) *ProxyService {
 	return &ProxyService{
-		cfg:       cfg,
-		log:       log,
-		channels:  channels,
-		logs:      logs,
-		extractor: extractor,
-		pii:       piiTransformer,
+		cfg:           cfg,
+		log:           log,
+		channels:      channels,
+		logs:          logs,
+		extractor:     extractor,
+		pii:           piiTransformer,
+		bankListCache: bankListCache,
 		httpClient: &http.Client{
 			Timeout: cfg.Server.UpstreamTimeout,
 		},
@@ -81,6 +87,13 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 	params := sign.MapFromJSON(body)
 	if !sign.Verify(params, ch.ChannelKey) {
 		return s.errorResponse(401, "sign verify failed"), http.StatusOK, nil
+	}
+
+	// getBankList 优先读 Redis 缓存，减少对华安上游的重复调用
+	if apiPath == bankListAPIPath {
+		if out, ok := s.respondBankListFromCache(ctx, traceID, channelCode, string(rawBody)); ok {
+			return out, http.StatusOK, nil
+		}
 	}
 
 	// 保留加密态副本，供日志落库脱敏（避免在 audit 表存明文三要素）
@@ -128,6 +141,10 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		huaanCode = int(c)
 	}
 
+	if apiPath == bankListAPIPath {
+		s.cacheBankList(ctx, channelCode, respBytes)
+	}
+
 	// 基于明文响应抽取用户/保单等实体（异步失败不影响渠道响应）
 	s.extractor.Process(channelCode, apiPath, body, respBody)
 
@@ -147,6 +164,140 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 	)
 
 	return out, http.StatusOK, nil
+}
+
+const bankListAPIPath = "/getBankList"
+
+// GetCachedBankList 返回 Redis 中华安原始响应 JSON；未命中时 data 为 nil。
+func (s *ProxyService) GetCachedBankList(ctx context.Context, channelCode string) ([]byte, error) {
+	return s.bankListCache.Get(ctx, channelCode)
+}
+
+// RefreshBankList 管理后台手动请求华安 /getBankList，使用调用方提供的渠道码与华安密钥。
+func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKey string) ([]byte, error) {
+	if channelCode == "" || huaAnKey == "" {
+		return nil, errors.New("channelCode and huaAnKey required")
+	}
+
+	traceID := uuid.New().String()
+	body := map[string]interface{}{
+		"timestamp":   fmt.Sprintf("%d", time.Now().UnixMilli()),
+		"channelCode": channelCode,
+		"key":         huaAnKey,
+	}
+	body["sign"] = sign.Build(body, huaAnKey)
+
+	upstreamURL := s.cfg.HuaAn.BaseURL + s.cfg.HuaAn.APIPath + bankListAPIPath
+	reqBytes, _ := json.Marshal(body)
+
+	start := time.Now()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upstreamURL, bytes.NewReader(reqBytes))
+	if err != nil {
+		return nil, fmt.Errorf("build upstream request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := s.httpClient.Do(req)
+	duration := time.Since(start).Milliseconds()
+	if err != nil {
+		s.saveLog(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), "", 0, duration, err.Error())
+		if ctx.Err() != nil {
+			return nil, errors.New("upstream timeout")
+		}
+		return nil, fmt.Errorf("upstream unavailable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read upstream response: %w", err)
+	}
+
+	var respBody map[string]interface{}
+	_ = json.Unmarshal(respBytes, &respBody)
+	huaanCode := 0
+	if c, ok := respBody["code"].(float64); ok {
+		huaanCode = int(c)
+	}
+
+	s.saveLog(traceID, channelCode, bankListAPIPath, maskAdminLogBody(body), string(respBytes), huaanCode, duration, "")
+
+	s.cacheBankList(ctx, channelCode, respBytes)
+
+	s.log.Info("admin bank list refresh",
+		zap.String("traceId", traceID),
+		zap.String("channelCode", channelCode),
+		zap.Int("huaanCode", huaanCode),
+		zap.Int64("durationMs", duration),
+	)
+
+	return respBytes, nil
+}
+
+func (s *ProxyService) cacheBankList(ctx context.Context, channelCode string, respBytes []byte) {
+	if !huaAnResponseOK(respBytes) {
+		return
+	}
+	if err := s.bankListCache.Set(ctx, channelCode, respBytes); err != nil {
+		s.log.Warn("bank list cache set failed",
+			zap.String("channelCode", channelCode),
+			zap.Error(err),
+		)
+	}
+}
+
+// respondBankListFromCache 命中缓存时构造渠道响应并写审计日志。
+func (s *ProxyService) respondBankListFromCache(ctx context.Context, traceID, channelCode, reqLog string) ([]byte, bool) {
+	cached, err := s.bankListCache.Get(ctx, channelCode)
+	if err != nil {
+		s.log.Warn("bank list cache get failed",
+			zap.String("traceId", traceID),
+			zap.String("channelCode", channelCode),
+			zap.Error(err),
+		)
+		return nil, false
+	}
+	if len(cached) == 0 {
+		return nil, false
+	}
+
+	var respBody map[string]interface{}
+	if err := json.Unmarshal(cached, &respBody); err != nil {
+		return nil, false
+	}
+	huaanCode := 0
+	if c, ok := respBody["code"].(float64); ok {
+		huaanCode = int(c)
+	}
+	_ = s.pii.EncryptResponse(respBody)
+	out, _ := json.Marshal(respBody)
+
+	s.saveLog(traceID, channelCode, bankListAPIPath, reqLog, string(cached), huaanCode, 0, "cache hit")
+	s.log.Info("bank list cache hit",
+		zap.String("traceId", traceID),
+		zap.String("channelCode", channelCode),
+		zap.Int("huaanCode", huaanCode),
+	)
+	return out, true
+}
+
+func huaAnResponseOK(respBytes []byte) bool {
+	var resp map[string]interface{}
+	if err := json.Unmarshal(respBytes, &resp); err != nil {
+		return false
+	}
+	code, ok := resp["code"].(float64)
+	return ok && int(code) == 200
+}
+
+// maskAdminLogBody 管理后台直连请求日志中掩码密钥字段。
+func maskAdminLogBody(m map[string]interface{}) string {
+	cp := cloneMap(m)
+	if _, ok := cp["key"]; ok {
+		cp["key"] = "***"
+	}
+	b, _ := json.Marshal(cp)
+	return string(b)
 }
 
 // saveLog 写入 api_request_logs，错误被忽略以免阻塞主链路。
