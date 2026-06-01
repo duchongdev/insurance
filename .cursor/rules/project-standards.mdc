@@ -1,0 +1,63 @@
+---
+description: insurance-bridge 项目架构、分层与 Git 提交约定
+alwaysApply: true
+---
+
+# insurance-bridge 项目规范
+
+## 模块与目录
+
+- 模块名：`github.com/huaan/insurance-bridge`；Go **1.22+**。
+- 入口与组装：`cmd/server/main.go`（依赖注入、路由注册、定时任务启动）。
+- 业务代码均在 `internal/`，禁止在模块根建可 import 的 `pkg/`。
+- API 契约：`api/openapi.yaml`；运行时配置：`config/config.yaml` 或 `BRIDGE_*` 环境变量。
+
+## 分层与依赖方向
+
+```
+handler → service → repository → model
+                ↘ internal/pkg（sign/cipher/pii/logger）
+```
+
+| 包 | 职责 |
+|----|------|
+| `handler` | HTTP：读 body、调 service、写响应；不写业务规则 |
+| `service` | 验签、代理、抽取、管理后台逻辑 |
+| `repository` | GORM 数据访问，不含业务判断 |
+| `model` | 持久化实体（GORM struct） |
+| `middleware` | 全站 Gin 中间件，在 `main` 的 `r.Use` 注册 |
+| `job` / `bootstrap` | 定时任务、首次 Seed |
+
+**禁止**：`repository`/`model` 依赖 `handler`/`service`；循环依赖。
+
+## 新增代码放哪里
+
+- 全站 HTTP 约束 → `internal/middleware` + `main.go`
+- 仅管理后台 → `handler/admin.go` 路由组中间件
+- 渠道 API 共用规则 → `service/proxy.go`（或 `ProxyService` 私有方法）
+- 表级约束 → `model` GORM tag 或迁移 SQL
+- 可复用工具（签名、加密）→ `internal/pkg/<name>/`
+
+## Git 提交
+
+- **一功能 / 一问题一提交（原子性）**：同一 commit 只包含解决**同一个 bug** 或完成**同一项功能**的改动；无关文件不要混在同一提交。
+  - 示例：`fix(admin)` 只含管理后台修复，不含部署脚本；`feat(deploy)` 只含交付与部署相关文件。
+  - 改 OpenAPI 时同步的 README 属于同一功能，可放在同一 commit（见下文「文档与接口同步」）。
+- **修复或功能完成后自动提交**：Agent 完成 bug 修复、功能实现或用户明确要求的变更后，**应主动执行 `git commit`**，无需用户再次提醒；提交前用 `git status` / `git diff` 确认仅包含本次原子变更。
+- **标题与说明优先中文**；模块名、路径、命令可中英混写。
+- 示例：
+  - `fix(proxy): 修复渠道验签失败时未落审计日志`
+  - `feat(admin): 管理后台支持按渠道筛选保单`
+  - `chore: 升级 gin 至 v1.10.0`
+
+## 文档与接口同步（强制）
+
+- **改 `api/openapi.yaml`** → 同一任务内同步 `README.md`（见 `.cursor/rules/api-documentation.mdc`）。
+- **改对外 HTTP 接口**（handler 路由、请求/响应、鉴权）→ 同一任务内同步 `api/openapi.yaml`。
+- OpenAPI、README、handler 的接口改动尽量放在**同一 commit**，便于 review。
+
+## 改动原则
+
+- 最小 diff：只改与任务相关的文件，不顺手重构。
+- 不新增无请求的测试、文档或抽象层（**接口相关文档同步除外**）。
+- 敏感配置与密钥不得写入仓库。

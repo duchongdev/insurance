@@ -1,0 +1,67 @@
+---
+description: Go 编码风格与注释约定（internal / cmd）
+globs: "{internal,cmd}/**/*.go"
+alwaysApply: false
+---
+
+# Go 编码约定
+
+## 注释（必要且克制）
+
+新增或修改 Go 代码时，**必须**补充能让后续维护者读懂的注释；不写废话、不重复代码字面意思。
+
+| 必须注释 | 说明 |
+|---------|------|
+| 每个 `package` | 一行中文说明包职责（已有则保持） |
+| 导出类型 / 函数 / 方法 | 中文 godoc：做什么、关键参数/返回值 |
+| 非显而易见的业务规则 | 如验签顺序、三要素加解密、key 替换、错误码含义 |
+| 魔法值、状态码、表字段语义 | 行尾或块注释说明「为什么」 |
+| 复杂分支或算法 | 简要说明意图，必要时 1～2 行 |
+
+**不必**注释：getter/setter、一眼能看懂的 CRUD、标准库用法。
+
+示例（与现有风格一致）：
+
+```go
+// ProxyService 渠道 API 代理核心：验签 → 解密三要素 → 换华安 key 重签 → 转发 → 抽取业务 → 加密响应 → 落审计日志。
+type ProxyService struct { ... }
+
+// Forward 处理单次渠道请求；返回 JSON 字节与 HTTP status（渠道侧固定 200 时 status 仍为 200）。
+func (s *ProxyService) Forward(ctx context.Context, apiPath string, raw []byte) ([]byte, int, error) {
+```
+
+## 风格（与现有代码一致）
+
+- 构造函数命名：`NewXxx` / `NewXxxRepo` / `NewXxxHandler`。
+- 仓储错误：`var ErrXxx = errors.New("...")` 放在对应 `repository` 包。
+- 日志用 `go.uber.org/zap`；渠道/代理链路保留 `trace_id` 字段。
+- import 顺序：标准库 → 第三方 → 本项目模块。
+
+## 各层写法
+
+```go
+// handler：薄层，委托 service
+func (h *ChannelHandler) handle(c *gin.Context, apiPath string) {
+    out, status, _ := h.proxy.Forward(c.Request.Context(), apiPath, raw)
+    c.Data(status, "application/json; charset=utf-8", out)
+}
+
+// service：业务规则与编排，可依赖 repository + internal/pkg
+// repository：仅 GORM 操作，返回 model 或 error
+```
+
+- `handler` 尽量不直接访问 `*gorm.DB`（健康检查等例外可保留）。
+- 渠道 API 响应格式遵循华安文档（多数 `HTTP 200` + body.code）。
+- 管理后台 JSON 字段与 `model` 的 json tag 保持一致。
+
+## 测试与构建
+
+- 单测文件：`<pkg>_test.go`，与实现同包；签名/加密等纯函数优先补测试。
+- 提交前：`go test ./...`（或 `make test`）。
+- 本地运行：`make run` 或 `go run ./cmd/server`。
+
+## 避免
+
+- 在 `handler` 重复 `service` 已有逻辑。
+- 为「可能以后用到」提前抽 interface（除非单测需要 mock）。
+- 修改 `go.mod` 中 Go 版本低于 1.22（依赖 `log/slog`、`slices`）。

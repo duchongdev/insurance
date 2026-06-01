@@ -1,0 +1,60 @@
+---
+description: API 变更与 OpenAPI、README 同步约定
+globs: "{api/**/*.yaml,internal/handler/**/*.go,README.md}"
+alwaysApply: false
+---
+
+# API 与文档同步
+
+## 单一事实来源
+
+- **HTTP 契约**：`api/openapi.yaml`（对外路径、方法、请求/响应 schema）。
+- **使用说明**：`README.md`（功能概览、访问地址、接入步骤、配置项）。
+- **实现**：`internal/handler/channel.go`（渠道路由）、`internal/handler/admin.go`（管理 API）。
+
+## 规则 1：改 OpenAPI → 必须同步 README
+
+修改 `api/openapi.yaml` 时，同一任务内检查并更新 `README.md` 中对应内容：
+
+| OpenAPI 变更 | README 需同步的位置 |
+|-------------|-------------------|
+| 新增/删除/改名路径 | 「功能概览」「快速启动」中的 URL 说明 |
+| 管理后台 API 变动 | 「管理后台」相关描述 |
+| 鉴权方式变更 | 「渠道接入说明」或管理后台说明 |
+| 请求体/三要素/签名规则 | 「渠道接入说明」 |
+| `info.version` 或重大行为变更 | 「功能概览」必要时补充一句 |
+
+**禁止**只改 OpenAPI 而不更新 README（纯 typo/格式修正且不影响语义除外）。
+
+## 规则 2：接口实现变动 → 必须同步 OpenAPI
+
+以下任一改动，**同一任务内**更新 `api/openapi.yaml`：
+
+- `internal/handler/channel.go` 的 `apiRoutes` 增删改路径或 HTTP 方法
+- `internal/handler/admin.go` 的 `Register` 增删改路由、参数、响应结构
+- `cmd/server/main.go` 新增/变更对外 HTTP 路径（如健康检查、静态路由）
+- `service` 层导致对外 JSON 字段、错误码语义、鉴权方式变化
+
+同步检查项：
+
+- [ ] `paths` 下 path + method 与代码一致
+- [ ] `requestBody` / 参数与 handler 绑定一致
+- [ ] `components/schemas` 反映实际 JSON 字段
+- [ ] 渠道接口仍标注 `tags: [渠道接口]`；管理接口标注管理相关 tag
+- [ ] 需要时 bump `info.version`（破坏性变更必 bump）
+
+## 规则 3：同一 PR / 同一 commit 内完成
+
+OpenAPI、README、handler 的接口相关改动应放在**同一提交**，便于 review。提交信息示例：
+
+- `feat(api): 新增 xxx 接口并更新 openapi 与 README`
+- `docs: 同步 openapi 与管理后台 README 说明`
+
+## 参考对照
+
+```
+handler/channel.go apiRoutes  ↔  openapi paths /upChannelApi/*
+handler/admin.go Register     ↔  openapi paths /admin/api/*
+main.go 路由                  ↔  openapi /health/* 等
+README 快速启动 URL           ↔  openapi servers + paths
+```
