@@ -9,6 +9,7 @@
 | 操作系统 | Linux x86_64（推荐 Ubuntu 20.04+ / CentOS 7+） |
 | Docker | 20.10+ |
 | Docker Compose | v2（`docker compose`）或 v1（`docker-compose`） |
+| Node.js | 18+（构建管理后台前端；`scripts/start.sh` 会自动调用 `scripts/build-admin.sh`） |
 | 网络 | 首次构建需访问外网拉取基础镜像与 Go 依赖 |
 | 端口 | 默认占用 **5051**（Nginx 反向代理，可在 `.env` 修改 `APP_PORT`） |
 
@@ -76,7 +77,14 @@ chmod +x scripts/*.sh
 ./scripts/start.sh
 ```
 
-首次启动会构建镜像（约数分钟），之后启动更快。
+首次启动会构建 Docker 镜像（约数分钟）；若 `web/admin/dist/` 不存在，会先构建 Vue 管理后台。
+
+也可提前构建前端：
+
+```bash
+bash scripts/build-admin.sh
+./scripts/start.sh
+```
 
 ## 验证
 
@@ -158,3 +166,65 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 │   └── package.sh            # 交付方打包容器（开发用）
 └── logs/                     # 应用日志目录
 ```
+---
+## 一键安装 Docker
+```
+# 卸载旧版本（如果有）
+yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
+
+# 安装依赖
+yum install -y yum-utils device-mapper-persistent-data lvm2
+
+# 添加阿里云 Docker 官方源（国内速度最快）
+yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+
+# 安装 Docker
+yum install -y docker-ce docker-ce-cli containerd.io
+
+# 启动 Docker 并设置开机自启
+systemctl start docker
+systemctl enable docker
+
+# 验证安装
+docker --version 
+```
+##  一键安装 Docker Compose（最新版）
+```
+# 下载 Docker Compose 最新稳定版
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+# 添加执行权限
+chmod +x /usr/local/bin/docker-compose
+
+# 创建软链接（让命令全局可用）
+ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+
+# 验证安装
+docker-compose --version
+```
+
+## 配置阿里云镜像加速（必须配置，否则拉取镜像极慢）
+```
+# 创建 docker 配置目录
+mkdir -p /etc/docker
+
+# 写入阿里云镜像加速地址
+tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://mirror.baidubce.com"
+  ]
+}
+EOF
+
+# 重启 Docker 生效
+systemctl daemon-reload
+systemctl restart docker
+```
+
+## 测试是否安装成功（跑一个 hello-world）
+```
+docker run --rm hello-world
+```
+
