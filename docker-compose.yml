@@ -1,14 +1,14 @@
+# 交付部署：复制 .env.example → .env 并修改后，执行 ./scripts/start.sh
 services:
   mysql:
-    image: mariadb:11.4
+    image: ${MYSQL_IMAGE:-mariadb:10.6}
     container_name: insurance-bridge-mysql
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123
-      MYSQL_DATABASE: insurance_bridge
-      MYSQL_USER: bridge
-      MYSQL_PASSWORD: bridge123
-    ports:
-      - "3306:3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-insurance_bridge}
+      MYSQL_USER: ${MYSQL_USER:-bridge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -16,21 +16,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    # 数据库仅 Compose 内网访问；需宿主机调试时可自行添加 ports: ["3306:3306"]
 
   bridge:
+    image: ${BRIDGE_IMAGE:-insurance-bridge:local}
     build: .
     container_name: insurance-bridge-app
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${APP_PORT:-5051}:8080"
+    env_file:
+      - .env
     environment:
       CONFIG_PATH: /app/config/config.yaml
-      BRIDGE_DATABASE_DSN: bridge:bridge123@tcp(mysql:3306)/insurance_bridge?charset=utf8mb4&parseTime=True&loc=Local
-      BRIDGE_HUAAN_BASE_URL: https://xx.xxx.api.york.xin
-      BRIDGE_SECURITY_DATA_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef"
-      BRIDGE_SECURITY_JWT_SECRET: "change-me-in-production-jwt-secret-key"
+      TZ: Asia/Shanghai
     volumes:
       - ./logs:/app/logs
-      - ./config/config.yaml:/app/config/config.yaml
+      - ./config/config.yaml:/app/config/config.yaml:ro
     depends_on:
       mysql:
         condition: service_healthy

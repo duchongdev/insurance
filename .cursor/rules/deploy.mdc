@@ -1,0 +1,52 @@
+---
+description: 测试环境服务器部署约定（地址、目录、停服流程）
+alwaysApply: true
+---
+
+# 测试环境部署约定
+
+## 测试服务器
+
+| 项 | 值 |
+|----|-----|
+| 地址 | `10.41.61.41` |
+| 用户名 | `root` |
+| 登录方式 | 本机已配置 SSH 免密，直接使用 `ssh root@10.41.61.41` |
+
+## 部署目录
+
+- 服务器上的项目根目录：**`/home/ins/`**
+- 上传压缩包后在此目录解压；`.env`、`config/config.yaml` 等配置保留在服务器该目录，勿覆盖生产/测试已填好的密钥。
+
+## 部署前必做：先停服务
+
+**任何部署操作之前**，先在服务器项目目录停止运行中的服务：
+
+```bash
+ssh root@10.41.61.41 'cd /home/ins && ./scripts/stop.sh'
+```
+
+或在已 SSH 登录的服务器上：
+
+```bash
+cd /home/ins
+./scripts/stop.sh
+```
+
+确认容器已停止（`docker compose ps` 无 running 的 bridge/mysql）后，再进行上传、解压、覆盖代码、构建启动。
+
+## 推荐部署流程
+
+1. 本机打包：`make package`
+2. **停服**（见上）
+3. 上传压缩包至 `/home/ins/`（或临时目录后解压覆盖，保留 `.env` 与 `config/config.yaml`）
+4. 解压、必要时合并配置
+5. 启动：`cd /home/ins && ./scripts/start.sh`
+6. 验证：`curl http://127.0.0.1:5051/health/ready`
+
+## 注意
+
+- 部署相关命令默认针对测试机 `root@10.41.61.41:/home/ins`。
+- 说「部署 / 部署测试 / 测试环境 / 更新测试环境服务」等时，Agent 应使用 skill **deploy-test**（`.cursor/skills/deploy-test/SKILL.md`）并执行 `make deploy-test`。
+- 不要将在 `.env` 中的密钥、密码写入规则或提交 Git。
+- 详细用户手册见根目录 `DEPLOY.md`。

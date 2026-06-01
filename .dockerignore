@@ -1,0 +1,13 @@
+.git
+.cursor
+.idea
+.vscode
+logs
+*.log
+bin
+bridge
+dist
+.env
+config/config.yaml
+.DS_Store
+**/*_test.go

@@ -1,6 +1,10 @@
 logs/
 *.log
+bin/
 bridge
+dist/
+.env
+config/config.yaml
 .DS_Store
 .idea/
 .vscode/

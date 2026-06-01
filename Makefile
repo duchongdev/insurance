@@ -1,4 +1,4 @@
-.PHONY: tidy test build run
+.PHONY: tidy test build run package install start stop deploy-test
 
 GOPROXY ?= https://goproxy.io,direct
 GOSUMDB ?= sum.golang.org
@@ -14,3 +14,19 @@ build: tidy
 
 run: build
 	CONFIG_PATH=config/config.yaml ./bin/bridge
+
+# 生成交付压缩包 → dist/insurance-bridge-<go版本>-<日期>.tar.gz
+package:
+	bash scripts/package.sh
+
+install:
+	bash scripts/install.sh
+
+start:
+	bash scripts/start.sh
+
+stop:
+	bash scripts/stop.sh
+
+deploy-test:
+	bash scripts/deploy-test.sh

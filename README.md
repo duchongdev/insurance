@@ -13,19 +13,44 @@
 
 ## 快速启动
 
+### 服务器交付部署（推荐）
+
+解压压缩包后：
+
 ```bash
-cd insurance-bridge
-docker compose up -d --build
+chmod +x scripts/*.sh
+./scripts/install.sh          # 生成 .env 与 config/config.yaml
+# 编辑 .env 与 config/config.yaml 中的密码、华安域名、32 字节密钥
+./scripts/start.sh
 ```
 
-- 渠道 API：`http://localhost:8080/upChannelApi/...`
-- 管理后台：`http://localhost:8080/admin/`
-- 默认管理员：`admin` / `admin123`（首次启动自动创建）
-- OpenAPI：`api/openapi.yaml`
+详细步骤见 **[DEPLOY.md](./DEPLOY.md)**。交付方打包容器：
+
+```bash
+make package   # 输出 dist/insurance-bridge-*.tar.gz
+```
+
+### 本地 Docker
+
+```bash
+cp .env.example .env
+cp config/config.yaml.example config/config.yaml
+# 编辑上述文件（本地可用默认测试密码）
+./scripts/start.sh
+```
+
+- 渠道 API：`http://localhost:5051/upChannelApi/...`
+- 管理后台：`http://localhost:5051/admin/`
+- 默认管理员：见 `config/config.yaml` 中 `admin` 段（首次启动自动创建）
+- OpenAPI：`http://localhost:5051/openapi.yaml`
 
 ## 配置
 
-`config/config.yaml` 或通过环境变量 `BRIDGE_*` 覆盖，例如：
+主配置为 **`.env`**（Docker 部署）与 **`config/config.yaml`**；环境变量 `BRIDGE_*` 会覆盖 yaml 中同名项。模板见 `.env.example`、`config/config.yaml.example`。
+
+| 变量 | 说明 |
+|------|------|
+| `BRIDGE_DATABASE_DSN` | MySQL/MariaDB 连接串 |
 
 | 变量 | 说明 |
 |------|------|
