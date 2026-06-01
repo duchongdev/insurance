@@ -32,11 +32,11 @@ func (t *Transformer) DecryptRequest(body map[string]interface{}) error {
 		}
 		body[field] = plain
 	}
-	return decryptNested(body)
+	return t.decryptNested(body)
 }
 
 // decryptNested 处理请求体 insuredList 数组中被渠道加密的被保人字段。
-func decryptNested(body map[string]interface{}) error {
+func (t *Transformer) decryptNested(body map[string]interface{}) error {
 	if list, ok := body["insuredList"].([]interface{}); ok {
 		for _, item := range list {
 			if m, ok := item.(map[string]interface{}); ok {
