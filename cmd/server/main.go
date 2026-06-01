@@ -93,8 +93,15 @@ func main() {
 	adminHandler := handler.NewAdminHandler(adminSvc)
 	adminHandler.Register(r.Group("/admin/api"))
 
+	// 仅内嵌 index.html；不用 StaticFS("/admin")，避免与 /admin/api 路由冲突
 	adminSub, _ := fs.Sub(adminFS, "web/admin")
-	r.StaticFS("/admin", http.FS(adminSub))
+	r.GET("/admin", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/admin/")
+	})
+	r.GET("/admin/", func(c *gin.Context) {
+		// 不用 FileFromFS：对 index.html 会 301 到 ./，与 /admin/ 路由形成无限重定向
+		http.ServeFileFS(c.Writer, c.Request, adminSub, "index.html")
+	})
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/admin/")
 	})
