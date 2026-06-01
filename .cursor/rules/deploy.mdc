@@ -44,9 +44,16 @@ cd /home/ins
 5. 启动：`cd /home/ins && ./scripts/start.sh`
 6. 验证：`curl http://127.0.0.1:5051/health/ready`
 
+## 改造完成后自动部署（默认）
+
+- 在本仓库完成**功能实现、bug 修复或管理后台/接口改造**后，Agent **应主动**执行测试环境部署，无需用户再次说「部署」。
+- 执行方式：读取 skill **deploy-test**，运行 `make deploy-test`（即 `scripts/deploy-test.sh`）。
+- 部署结束向用户汇报：成功/失败、健康检查 `ready OK`、管理后台地址 `http://10.41.61.41:5051/admin/`。
+- **例外**（可跳过部署）：仅改文档/注释且无运行时影响；用户明确说「先不要部署」；纯本地探索未改可交付代码。
+
 ## 注意
 
 - 部署相关命令默认针对测试机 `root@10.41.61.41:/home/ins`。
-- 说「部署 / 部署测试 / 测试环境 / 更新测试环境服务」等时，Agent 应使用 skill **deploy-test**（`.cursor/skills/deploy-test/SKILL.md`）并执行 `make deploy-test`。
+- 用户说「部署 / 部署测试 / 测试环境 / 更新测试环境 / 更新远程服务器」等，或要求「改造完自动更新服务器」时，同样执行 **deploy-test** skill 与 `make deploy-test`。
 - 不要将在 `.env` 中的密钥、密码写入规则或提交 Git。
 - 详细用户手册见根目录 `DEPLOY.md`。

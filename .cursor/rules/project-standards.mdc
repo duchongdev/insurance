@@ -56,6 +56,11 @@ handler → service → repository → model
 - **改对外 HTTP 接口**（handler 路由、请求/响应、鉴权）→ 同一任务内同步 `api/openapi.yaml`。
 - OpenAPI、README、handler 的接口改动尽量放在**同一 commit**，便于 review。
 
+## 测试环境自动部署
+
+- 完成可交付改动（后端、管理后台 `web/admin`、部署脚本等）后，**同一任务内**执行 `make deploy-test`（见 `.cursor/rules/deploy.mdc`、skill `deploy-test`）。
+- 先完成代码与必要文档同步，再部署；部署不替代 `git commit`（仍按用户是否要求提交为准）。
+
 ## 改动原则
 
 - 最小 diff：只改与任务相关的文件，不顺手重构。
