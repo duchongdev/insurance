@@ -34,6 +34,7 @@ func (h *AdminHandler) Register(r *gin.RouterGroup) {
 	auth.GET("/policies", h.listPolicies)
 	auth.GET("/users", h.listUsers)
 	auth.GET("/signs", h.listSigns)
+	auth.GET("/banks", h.listBanks)
 	auth.POST("/bank-list/refresh", h.refreshBankList)
 	auth.GET("/bank-list", h.getBankList)
 }
@@ -217,6 +218,19 @@ func (h *AdminHandler) listSigns(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 	list, total, err := h.admin.ListSigns(c.Query("channelCode"), page, size)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
+}
+
+// listBanks 分页查询 bank_info_t 银行信息。
+func (h *AdminHandler) listBanks(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
+	status, _ := strconv.Atoi(c.DefaultQuery("status", "0"))
+	list, total, err := h.admin.ListBanks(int8(status), page, size)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return

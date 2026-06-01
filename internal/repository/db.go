@@ -27,6 +27,7 @@ func NewDB(dsn string) (*gorm.DB, error) {
 		&model.SignRecord{},
 		&model.ProductRecord{},
 		&model.PaymentRecord{},
+		&model.BankInfo{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}

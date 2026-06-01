@@ -27,59 +27,59 @@ type AdminUser struct {
 
 // APIRequestLog 单次渠道 API 调用的审计记录，与代理链路 trace_id 对应，供后台查询与排障。
 type APIRequestLog struct {
-	ID           uint64    `gorm:"primaryKey"`
-	TraceID      string    `gorm:"index;size:64;not null"`  // 链路 ID（代理内生成 UUID，可与 X-Trace-Id 关联）
-	ChannelCode  string    `gorm:"index;size:64"`           // 渠道编码
-	APIPath      string    `gorm:"index;size:128;not null"` // 如 /proInsurance
-	RequestBody  string    `gorm:"type:longtext"`           // 脱敏后的请求 JSON（三要素已 Mask）
-	ResponseBody string    `gorm:"type:longtext"`           // 华安原始响应 JSON（明文，便于对账）
-	HuaAnCode    int       `gorm:"index"`                   // 华安响应 body.code
-	DurationMS   int64                                     // 上游往返耗时（毫秒）
-	ErrorMessage string    `gorm:"size:512"`                // 上游失败或超时时的错误摘要
-	CreatedAt    time.Time `gorm:"index"`
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	TraceID      string    `gorm:"index;size:64;not null" json:"traceId"`       // 链路 ID（代理内生成 UUID，可与 X-Trace-Id 关联）
+	ChannelCode  string    `gorm:"index;size:64" json:"channelCode"`            // 渠道编码
+	APIPath      string    `gorm:"index;size:128;not null" json:"apiPath"`      // 如 /proInsurance
+	RequestBody  string    `gorm:"type:longtext" json:"requestBody,omitempty"`  // 脱敏后的请求 JSON（三要素已 Mask）
+	ResponseBody string    `gorm:"type:longtext" json:"responseBody,omitempty"` // 华安原始响应 JSON（明文，便于对账）
+	HuaAnCode    int       `gorm:"index" json:"huaanCode"`                      // 华安响应 body.code
+	DurationMS   int64     `json:"durationMS"`                                  // 上游往返耗时（毫秒）
+	ErrorMessage string    `gorm:"size:512" json:"errorMessage,omitempty"`      // 上游失败或超时时的错误摘要
+	CreatedAt    time.Time `gorm:"index" json:"createdAt"`
 }
 
 // UserRecord 用户三要素快照（库内 AES 加密），由 /verifyNoCode 等接口响应抽取。
 type UserRecord struct {
-	ID          uint64    `gorm:"primaryKey"`
-	ChannelCode string    `gorm:"uniqueIndex:idx_channel_user;size:64;not null"` // 渠道 + 用户唯一
-	UserID      string    `gorm:"uniqueIndex:idx_channel_user;size:64"`          // 华安 userid
-	PhoneEnc    string    `gorm:"size:512"`                                      // 手机号密文
-	NameEnc     string    `gorm:"size:512"`                                      // 姓名密文
-	IDCardEnc   string    `gorm:"size:512"`                                      // 身份证号密文
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint64    `gorm:"primaryKey" json:"id"`
+	ChannelCode string    `gorm:"uniqueIndex:idx_channel_user;size:64;not null" json:"channelCode"` // 渠道 + 用户唯一
+	UserID      string    `gorm:"uniqueIndex:idx_channel_user;size:64" json:"userId"`               // 华安 userid
+	PhoneEnc    string    `gorm:"size:512" json:"-"`                                                // 手机号密文
+	NameEnc     string    `gorm:"size:512" json:"-"`                                                // 姓名密文
+	IDCardEnc   string    `gorm:"size:512" json:"-"`                                                // 身份证号密文
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // PolicyRecord 保单信息快照，由投保、查询、升级等接口响应抽取。
 type PolicyRecord struct {
-	ID              uint64    `gorm:"primaryKey"`
-	ChannelCode     string    `gorm:"index;size:64;not null"`
-	PolicyID        string    `gorm:"uniqueIndex;size:64;not null"` // 华安 policyId，全局唯一
-	PolicyNo        string    `gorm:"size:64"`                      // 保单号
-	UserID          string    `gorm:"index;size:64"`
-	ProductCode     string    `gorm:"size:64"`
-	ProductID       string    `gorm:"size:64"`
-	PolicyStatus    string    `gorm:"size:8"`   // 保单状态码
-	PolicyStartDate string    `gorm:"size:32"`  // 起保日
-	PolicyEndDate   string    `gorm:"size:32"`  // 终保日
-	PayPremium      string    `gorm:"size:32"`  // 保费（字符串保持与上游一致）
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID              uint64    `gorm:"primaryKey" json:"id"`
+	ChannelCode     string    `gorm:"index;size:64;not null" json:"channelCode"`
+	PolicyID        string    `gorm:"uniqueIndex;size:64;not null" json:"policyId"` // 华安 policyId，全局唯一
+	PolicyNo        string    `gorm:"size:64" json:"policyNo"`                      // 保单号
+	UserID          string    `gorm:"index;size:64" json:"userId"`
+	ProductCode     string    `gorm:"size:64" json:"productCode"`
+	ProductID       string    `gorm:"size:64" json:"productId"`
+	PolicyStatus    string    `gorm:"size:8" json:"policyStatus"`   // 保单状态码
+	PolicyStartDate string    `gorm:"size:32" json:"policyStartDate"` // 起保日
+	PolicyEndDate   string    `gorm:"size:32" json:"policyEndDate"`   // 终保日
+	PayPremium      string    `gorm:"size:32" json:"payPremium"`      // 保费（字符串保持与上游一致）
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 // SignRecord 签约/代扣链接记录，由 /getSignUrl 响应抽取。
 type SignRecord struct {
-	ID           uint64    `gorm:"primaryKey"`
-	ChannelCode  string    `gorm:"index;size:64;not null"`
-	SignID       string    `gorm:"index;size:64"`    // 签约流水号
-	PolicyID     string    `gorm:"index;size:64"`    // 关联保单
-	BankCode     string    `gorm:"size:32"`          // 银行编码
-	CardType     string    `gorm:"size:32"`          // 卡类型
-	PayChannelID string    `gorm:"size:64"`          // 支付渠道
-	SignURL      string    `gorm:"size:1024"`        // 签约 H5 地址
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uint64    `gorm:"primaryKey" json:"id"`
+	ChannelCode  string    `gorm:"index;size:64;not null" json:"channelCode"`
+	SignID       string    `gorm:"index;size:64" json:"signId"`       // 签约流水号
+	PolicyID     string    `gorm:"index;size:64" json:"policyId"`     // 关联保单
+	BankCode     string    `gorm:"size:32" json:"bankCode"`           // 银行编码
+	CardType     string    `gorm:"size:32" json:"cardType"`           // 卡类型
+	PayChannelID string    `gorm:"size:64" json:"payChannelId"`       // 支付渠道
+	SignURL      string    `gorm:"size:1024" json:"signUrl,omitempty"` // 签约 H5 地址
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // ProductRecord 渠道产品目录快照，由产品列表/报价接口抽取。
@@ -94,6 +94,21 @@ type ProductRecord struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+// BankInfo 银行信息，对应 bank_info_t；由华安 getBankList 响应同步或管理后台维护。
+type BankInfo struct {
+	ID         uint64    `gorm:"primaryKey;column:id" json:"id"`
+	BankCode   string    `gorm:"column:bank_code;uniqueIndex;size:64;not null" json:"bankCode"`
+	BankName   string    `gorm:"column:bank_name;size:128;not null" json:"bankName"`
+	DebitCard  int8      `gorm:"column:debit_card;not null;default:0" json:"debitCard"`
+	CreditCard int8      `gorm:"column:credit_card;not null;default:0" json:"creditCard"`
+	Status     int8      `gorm:"column:status;not null;default:1;index" json:"status"` // 1=启用 2=停用
+	CreateTime time.Time `gorm:"column:create_time;autoCreateTime" json:"createTime"`
+	UpdateTime time.Time `gorm:"column:update_time;autoUpdateTime" json:"updateTime"`
+}
+
+// TableName 指定 GORM 表名。
+func (BankInfo) TableName() string { return "bank_info_t" }
 
 // PaymentRecord 报价/支付流水（只增），用于统计各接口产生的价格记录。
 type PaymentRecord struct {

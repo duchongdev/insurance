@@ -7,7 +7,7 @@
 - **渠道 API**：完整实现 `ZF保险.md` 中 `/upChannelApi` 下 10 个接口
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
-- **数据落库**：接口日志、用户、保单、签约、产品、付费流水
+- **数据落库**：接口日志、用户、保单、签约、产品、付费流水、银行信息（`bank_info_t`）；`getBankList` 管理后台可全量同步，渠道侧优先 Redis → 库 → 华安
 - **管理后台**：Vue 3 + Element Plus（`web/admin/`），Nginx 托管 `/admin/`，REST API 在 `/admin/api`
 - **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化日志、90 天日志清理与归档
 

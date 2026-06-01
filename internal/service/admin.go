@@ -19,6 +19,7 @@ type AdminService struct {
 	channels  *repository.ChannelRepo
 	biz       *repository.BusinessRepo
 	logs      *repository.LogRepo
+	banks     *repository.BankRepo
 	jwtSecret []byte
 }
 
@@ -28,6 +29,7 @@ func NewAdminService(
 	channels *repository.ChannelRepo,
 	biz *repository.BusinessRepo,
 	logs *repository.LogRepo,
+	banks *repository.BankRepo,
 	jwtSecret string,
 ) *AdminService {
 	return &AdminService{
@@ -35,6 +37,7 @@ func NewAdminService(
 		channels:  channels,
 		biz:       biz,
 		logs:      logs,
+		banks:     banks,
 		jwtSecret: []byte(jwtSecret),
 	}
 }
@@ -159,4 +162,15 @@ func (s *AdminService) ListSigns(channelCode string, page, size int) ([]model.Si
 		size = 20
 	}
 	return s.biz.ListSigns(channelCode, (page-1)*size, size)
+}
+
+// ListBanks 分页查询银行信息；status 为 0 表示不限。
+func (s *AdminService) ListBanks(status int8, page, size int) ([]model.BankInfo, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+	return s.banks.List(status, (page-1)*size, size)
 }

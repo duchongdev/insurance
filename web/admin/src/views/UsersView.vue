@@ -45,9 +45,9 @@ onMounted(loadData)
       </div>
     </template>
     <el-table v-loading="loading" :data="list" stripe border>
-      <el-table-column prop="userId" label="userId" min-width="160" />
-      <el-table-column prop="channelCode" label="channelCode" min-width="120" />
-      <el-table-column prop="createdAt" label="createdAt" min-width="180" />
+      <el-table-column prop="userId" label="用户ID" min-width="160" />
+      <el-table-column prop="channelCode" label="渠道编码" min-width="120" />
+      <el-table-column prop="createdAt" label="创建时间" min-width="180" />
     </el-table>
     <div class="pager">
       <el-pagination

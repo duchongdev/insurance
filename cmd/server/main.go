@@ -66,6 +66,7 @@ func main() {
 	logRepo := repository.NewLogRepo(db)
 	bizRepo := repository.NewBusinessRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
+	bankRepo := repository.NewBankRepo(db)
 
 	if err := bootstrap.Seed(cfg, adminRepo, log); err != nil {
 		log.Fatal("seed failed", zap.Error(err))
@@ -75,8 +76,8 @@ func main() {
 	extractor := service.NewExtractor(bizRepo, crypter)
 	piiTransformer := pii.NewTransformer(crypter)
 	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, extractor, piiTransformer, bankListCache)
-	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, logRepo, cfg.Security.JWTSecret)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, logRepo, bankRepo, extractor, piiTransformer, bankListCache)
+	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, logRepo, bankRepo, cfg.Security.JWTSecret)
 
 	// --- HTTP 路由 ---
 	gin.SetMode(cfg.Server.Mode)

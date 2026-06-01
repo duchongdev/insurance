@@ -29,6 +29,7 @@ type ProxyService struct {
 	log           *zap.Logger
 	channels      *repository.ChannelRepo // 渠道密钥查询
 	logs          *repository.LogRepo       // 接口审计日志
+	banks         *repository.BankRepo      // 银行信息表
 	extractor     *Extractor                // 从华安响应抽取业务实体
 	pii           *pii.Transformer          // 三要素加解密
 	bankListCache *rediscache.BankListCache // 银行列表 Redis 缓存
@@ -41,6 +42,7 @@ func NewProxyService(
 	log *zap.Logger,
 	channels *repository.ChannelRepo,
 	logs *repository.LogRepo,
+	banks *repository.BankRepo,
 	extractor *Extractor,
 	piiTransformer *pii.Transformer,
 	bankListCache *rediscache.BankListCache,
@@ -50,6 +52,7 @@ func NewProxyService(
 		log:           log,
 		channels:      channels,
 		logs:          logs,
+		banks:         banks,
 		extractor:     extractor,
 		pii:           piiTransformer,
 		bankListCache: bankListCache,
@@ -89,9 +92,12 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		return s.errorResponse(401, "sign verify failed"), http.StatusOK, nil
 	}
 
-	// getBankList 优先读 Redis 缓存，减少对华安上游的重复调用
+	// getBankList：Redis 缓存 → 数据库 → 华安上游
 	if apiPath == bankListAPIPath {
 		if out, ok := s.respondBankListFromCache(ctx, traceID, channelCode, string(rawBody)); ok {
+			return out, http.StatusOK, nil
+		}
+		if out, ok := s.respondBankListFromDB(ctx, traceID, channelCode, string(rawBody)); ok {
 			return out, http.StatusOK, nil
 		}
 	}
@@ -244,6 +250,54 @@ func (s *ProxyService) cacheBankList(ctx context.Context, channelCode string, re
 			zap.Error(err),
 		)
 	}
+	if err := ReplaceBanksFromResponse(s.banks, respBytes); err != nil {
+		s.log.Warn("bank list db replace failed",
+			zap.String("channelCode", channelCode),
+			zap.Error(err),
+		)
+	}
+}
+
+// respondBankListFromDB 命中数据库时构造渠道响应、回填 Redis 并写审计日志。
+func (s *ProxyService) respondBankListFromDB(ctx context.Context, traceID, channelCode, reqLog string) ([]byte, bool) {
+	banks, err := s.banks.ListEnabled()
+	if err != nil {
+		s.log.Warn("bank list db query failed",
+			zap.String("traceId", traceID),
+			zap.String("channelCode", channelCode),
+			zap.Error(err),
+		)
+		return nil, false
+	}
+	if len(banks) == 0 {
+		return nil, false
+	}
+
+	raw, err := BuildBankListResponseBytes(banks)
+	if err != nil {
+		return nil, false
+	}
+	if err := s.bankListCache.Set(ctx, channelCode, raw); err != nil {
+		s.log.Warn("bank list cache set from db failed",
+			zap.String("channelCode", channelCode),
+			zap.Error(err),
+		)
+	}
+
+	var respBody map[string]interface{}
+	if err := json.Unmarshal(raw, &respBody); err != nil {
+		return nil, false
+	}
+	_ = s.pii.EncryptResponse(respBody)
+	out, _ := json.Marshal(respBody)
+
+	s.saveLog(traceID, channelCode, bankListAPIPath, reqLog, string(raw), 200, 0, "db hit")
+	s.log.Info("bank list db hit",
+		zap.String("traceId", traceID),
+		zap.String("channelCode", channelCode),
+		zap.Int("count", len(banks)),
+	)
+	return out, true
 }
 
 // respondBankListFromCache 命中缓存时构造渠道响应并写审计日志。

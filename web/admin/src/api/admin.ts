@@ -51,6 +51,17 @@ export interface SignRecord {
   createdAt?: string
 }
 
+export interface BankRecord {
+  id: number
+  bankCode: string
+  bankName: string
+  debitCard: number
+  creditCard: number
+  status: number
+  createTime?: string
+  updateTime?: string
+}
+
 export interface LogRecord {
   id: number
   traceId: string
@@ -97,6 +108,12 @@ export function fetchUsers(page: number, size: number, channelCode?: string) {
 export function fetchSigns(page: number, size: number, channelCode?: string) {
   return request.get<PageResult<SignRecord>>('/signs', {
     params: { page, size, channelCode: channelCode || undefined },
+  })
+}
+
+export function fetchBanks(page: number, size: number, status?: number) {
+  return request.get<PageResult<BankRecord>>('/banks', {
+    params: { page, size, status: status || undefined },
   })
 }
 

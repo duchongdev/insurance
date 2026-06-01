@@ -46,18 +46,18 @@ onMounted(loadData)
         <span>接口日志</span>
         <div class="filters">
           <el-input v-model="channelCode" placeholder="渠道编码" clearable style="width: 160px" />
-          <el-input v-model="apiPath" placeholder="apiPath" clearable style="width: 160px" />
+          <el-input v-model="apiPath" placeholder="接口路径" clearable style="width: 160px" />
           <el-button type="primary" :loading="loading" @click="onSearch">查询</el-button>
         </div>
       </div>
     </template>
     <el-table v-loading="loading" :data="list" stripe border>
-      <el-table-column prop="traceId" label="traceId" min-width="200" />
-      <el-table-column prop="channelCode" label="channelCode" min-width="120" />
-      <el-table-column prop="apiPath" label="apiPath" min-width="160" />
-      <el-table-column prop="huaanCode" label="huaanCode" width="100" />
-      <el-table-column prop="durationMS" label="durationMS" width="110" />
-      <el-table-column prop="createdAt" label="createdAt" min-width="180" />
+      <el-table-column prop="traceId" label="链路ID" min-width="200" />
+      <el-table-column prop="channelCode" label="渠道编码" min-width="120" />
+      <el-table-column prop="apiPath" label="接口路径" min-width="160" />
+      <el-table-column prop="huaanCode" label="响应码" width="100" />
+      <el-table-column prop="durationMS" label="耗时(ms)" width="110" />
+      <el-table-column prop="createdAt" label="创建时间" min-width="180" />
     </el-table>
     <div class="pager">
       <el-pagination
