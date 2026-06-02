@@ -13,6 +13,14 @@ import (
 )
 
 func TestClient_Call(t *testing.T) {
+	testClientCall(t, true)
+}
+
+func TestClient_Call_NoSign(t *testing.T) {
+	testClientCall(t, false)
+}
+
+func testClientCall(t *testing.T, signEnabled bool) {
 	const huaAnKey = "test-huaan-key"
 	var gotPath string
 	var gotBody map[string]interface{}
@@ -28,8 +36,9 @@ func TestClient_Call(t *testing.T) {
 
 	cfg := &config.Config{
 		HuaAn: config.HuaAnConfig{
-			BaseURL: srv.URL,
-			APIPath: "/upChannelApi",
+			BaseURL:     srv.URL,
+			APIPath:     "/upChannelApi",
+			SignEnabled: signEnabled,
 		},
 		Server: config.ServerConfig{UpstreamTimeout: 5 * time.Second},
 	}
@@ -38,6 +47,8 @@ func TestClient_Call(t *testing.T) {
 	body := BuildRequestBody("CH001", map[string]interface{}{
 		"phoneNo": "13800138000",
 		"name":    "张三",
+		"key":     "channel-key-should-be-removed",
+		"sign":    "old-sign-should-be-removed",
 	})
 	result, err := client.Call(t.Context(), "/getProductInfoByChannel", body, huaAnKey)
 	if err != nil {
@@ -46,11 +57,20 @@ func TestClient_Call(t *testing.T) {
 	if gotPath != "/upChannelApi/getProductInfoByChannel" {
 		t.Fatalf("path=%s", gotPath)
 	}
-	if gotBody["key"] != huaAnKey {
-		t.Fatalf("key=%v", gotBody["key"])
-	}
-	if !sign.Verify(sign.MapFromJSON(gotBody), huaAnKey) {
-		t.Fatal("upstream sign verify failed")
+	if signEnabled {
+		if gotBody["key"] != huaAnKey {
+			t.Fatalf("key=%v", gotBody["key"])
+		}
+		if !sign.Verify(sign.MapFromJSON(gotBody), huaAnKey) {
+			t.Fatal("upstream sign verify failed")
+		}
+	} else {
+		if _, ok := gotBody["key"]; ok {
+			t.Fatalf("key should be omitted, got %v", gotBody["key"])
+		}
+		if _, ok := gotBody["sign"]; ok {
+			t.Fatalf("sign should be omitted, got %v", gotBody["sign"])
+		}
 	}
 	if result.HuaAnCode != 200 {
 		t.Fatalf("huaanCode=%d", result.HuaAnCode)

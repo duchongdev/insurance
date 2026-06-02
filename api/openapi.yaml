@@ -185,10 +185,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [channelCode, huaAnKey]
+              required: [channelCode]
               properties:
                 channelCode: { type: string, description: 渠道编码 }
-                huaAnKey: { type: string, description: 华安签名密钥 }
+                huaAnKey: { type: string, description: 华安签名密钥；huaan.sign_enabled=true 时必填 }
       responses:
         '200':
           description: 华安 getBankList 原始响应

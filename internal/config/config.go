@@ -30,8 +30,9 @@ type ServerConfig struct {
 
 // HuaAnConfig 华安保险上游 API 根路径配置。
 type HuaAnConfig struct {
-	BaseURL string // 上游域名，如 https://xx.xxx.api.york.xin
-	APIPath string // 渠道 API 前缀，默认 /upChannelApi
+	BaseURL     string // 上游域名，如 https://xx.xxx.api.york.xin
+	APIPath     string // 渠道 API 前缀，默认 /upChannelApi
+	SignEnabled bool   // 请求华安时是否携带 key 与 sign，默认 false
 }
 
 // DatabaseConfig 数据库连接。
@@ -93,8 +94,9 @@ func Load(path string) (*Config, error) {
 			UpstreamTimeout: v.GetDuration("server.upstream_timeout"),
 		},
 		HuaAn: HuaAnConfig{
-			BaseURL: v.GetString("huaan.base_url"),
-			APIPath: v.GetString("huaan.api_path"),
+			BaseURL:     v.GetString("huaan.base_url"),
+			APIPath:     v.GetString("huaan.api_path"),
+			SignEnabled: v.GetBool("huaan.sign_enabled"),
 		},
 		Database: DatabaseConfig{
 			DSN: v.GetString("database.dsn"),
@@ -134,6 +136,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.upstream_timeout", "25s")
 	v.SetDefault("huaan.base_url", "https://xx.xxx.api.york.xin")
 	v.SetDefault("huaan.api_path", "/upChannelApi")
+	v.SetDefault("huaan.sign_enabled", false)
 	v.SetDefault("database.dsn", "bridge:bridge123@tcp(mysql:3306)/insurance_bridge?charset=utf8mb4&parseTime=True&loc=Local")
 	v.SetDefault("redis.addr", "redis:6379")
 	v.SetDefault("redis.db", 0)

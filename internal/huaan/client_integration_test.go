@@ -9,7 +9,7 @@ import (
 	"github.com/huaan/insurance-bridge/internal/huaan"
 )
 
-// 华安直连集成测试：调用本服务真实的 huaan.Client，直连华安环境。
+// 华安直连集成测试：调用本服务真实的 huaan.Client，直连华安环境（默认不携带 key/sign）。
 // 运行前设置环境变量，见 .env.huaan.example。
 //
 //	go test -tags=integration ./internal/huaan/ -v -count=1

@@ -47,11 +47,16 @@ type CallResult struct {
 	HuaAnCode  int // 响应 JSON 中 code 字段，解析失败时为 0
 }
 
-// Call 向华安 POST 请求。body 会被原地修改：key 设为 huaAnKey 并重算 sign。
+// Call 向华安 POST 请求。body 会被原地修改：开启签名时 key 设为 huaAnKey 并重算 sign；关闭时移除 key 与 sign。
 func (c *Client) Call(ctx context.Context, apiPath string, body map[string]interface{}, huaAnKey string) (*CallResult, error) {
-	body["key"] = huaAnKey
-	delete(body, "sign")
-	body["sign"] = sign.Build(body, huaAnKey)
+	if c.cfg.HuaAn.SignEnabled {
+		body["key"] = huaAnKey
+		delete(body, "sign")
+		body["sign"] = sign.Build(body, huaAnKey)
+	} else {
+		delete(body, "key")
+		delete(body, "sign")
+	}
 
 	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + c.cfg.HuaAn.APIPath + apiPath
 	reqBytes, err := json.Marshal(body)

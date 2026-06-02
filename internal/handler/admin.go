@@ -131,8 +131,8 @@ func (h *AdminHandler) refreshBankList(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid request"})
 		return
 	}
-	if req.ChannelCode == "" || req.HuaAnKey == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "channelCode and huaAnKey required"})
+	if req.ChannelCode == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "channelCode required"})
 		return
 	}
 	out, err := h.proxy.RefreshBankList(c.Request.Context(), req.ChannelCode, req.HuaAnKey)

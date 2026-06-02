@@ -143,8 +143,11 @@ func (s *ProxyService) GetCachedBankList(ctx context.Context, channelCode string
 
 // RefreshBankList 管理后台手动请求华安 /getBankList，使用调用方提供的渠道码与华安密钥。
 func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKey string) ([]byte, error) {
-	if channelCode == "" || huaAnKey == "" {
-		return nil, errors.New("channelCode and huaAnKey required")
+	if channelCode == "" {
+		return nil, errors.New("channelCode required")
+	}
+	if s.cfg.HuaAn.SignEnabled && huaAnKey == "" {
+		return nil, errors.New("huaAnKey required when huaan sign enabled")
 	}
 
 	body := huaan.BuildRequestBody(channelCode, nil)

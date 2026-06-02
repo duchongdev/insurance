@@ -15,7 +15,7 @@ tidy:
 test: tidy
 	go test ./...
 
-# 华安直连集成测试（需设置 HUAAN_BASE_URL、HUAAN_CHANNEL_CODE、HUAAN_KEY，见 docs/TESTING.md）
+# 华安直连集成测试（需设置 HUAAN_BASE_URL、HUAAN_CHANNEL_CODE，见 docs/TESTING.md）
 test-huaan:
 	go test -tags=integration ./internal/huaan/ -v -count=1
 

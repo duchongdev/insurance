@@ -47,7 +47,7 @@ flowchart TB
 |----|------|
 | 包路径 | `internal/huaan` |
 | 核心类型 | `huaan.Client` |
-| 职责 | 将 `body.key` 换为 `HuaAnKey`、重算 `sign`、POST 华安、返回**原始 JSON**（PII 明文） |
+| 职责 | 按 `huaan.sign_enabled` 决定是否携带 `key`/`sign`；开启时换为 `HuaAnKey` 并重签，关闭时从请求体移除这两项；POST 华安、返回**原始 JSON**（PII 明文） |
 | 入口方法 | `Client.Call(ctx, apiPath, body, huaAnKey)` |
 | 路径常量 | `huaan.APIPaths`（10 个接口，与渠道路由一一对应） |
 
@@ -107,8 +107,8 @@ sequenceDiagram
 
 | 字段 | 渠道 → 本服务 | 本服务 → 华安 | 华安 → 本服务 | 本服务 → 渠道 |
 |------|---------------|---------------|---------------|---------------|
-| `key` | `channelKey` | `huaAnKey` | — | — |
-| `sign` | 渠道密钥计算 | 华安密钥重算 | — | — |
+| `key` | `channelKey` | `huaAnKey`（`sign_enabled=true` 时） | — | — |
+| `sign` | 渠道密钥计算 | 华安密钥重算（`sign_enabled=true` 时） | — | — |
 | `phoneNo` 等 | AES 密文 | 明文 | 明文 | AES 密文 |
 
 ## 5. getBankList 特殊逻辑

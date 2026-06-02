@@ -32,8 +32,8 @@ func LoadEnvTestConfig(t *testing.T) EnvTestConfig {
 		Name:        os.Getenv("HUAAN_TEST_NAME"),
 		IDCard:      os.Getenv("HUAAN_TEST_ID_CARD"),
 	}
-	if cfg.BaseURL == "" || cfg.ChannelCode == "" || cfg.HuaAnKey == "" {
-		t.Skip("跳过华安直连测试：请设置 HUAAN_BASE_URL、HUAAN_CHANNEL_CODE、HUAAN_KEY")
+	if cfg.BaseURL == "" || cfg.ChannelCode == "" {
+		t.Skip("跳过华安直连测试：请设置 HUAAN_BASE_URL、HUAAN_CHANNEL_CODE")
 	}
 	if cfg.APIPath == "" {
 		cfg.APIPath = "/upChannelApi"
@@ -45,8 +45,9 @@ func LoadEnvTestConfig(t *testing.T) EnvTestConfig {
 func (e EnvTestConfig) ToAppConfig() *config.Config {
 	return &config.Config{
 		HuaAn: config.HuaAnConfig{
-			BaseURL: e.BaseURL,
-			APIPath: e.APIPath,
+			BaseURL:     e.BaseURL,
+			APIPath:     e.APIPath,
+			SignEnabled: false,
 		},
 		Server: config.ServerConfig{UpstreamTimeout: 30 * time.Second},
 	}
