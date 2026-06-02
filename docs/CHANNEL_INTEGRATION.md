@@ -67,4 +67,6 @@ Go 示例见 `internal/pkg/cipher/cipher.go`。
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 系统架构与分层
 - [TESTING.md](./TESTING.md) — 测试说明
+- [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道请求/响应 JSON 样例（与华安原文对照）
+- [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) — 华安上游原始 JSON 样例
 - [DEPLOY.md](./DEPLOY.md) — 部署与配置

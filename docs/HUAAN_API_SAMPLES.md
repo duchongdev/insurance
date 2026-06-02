@@ -2,6 +2,8 @@
 
 本文档保存华安上游接口的**原始 JSON 响应**，便于对照字段格式与联调。数据来自直连华安环境的集成测试，**非**本服务加工后的渠道响应（渠道侧三要素字段会加密，此处为华安明文）。文档中手机号、姓名、身份证号等**用户三要素**均以 `***` 脱敏展示。
 
+渠道商调用本服务时的请求/响应样例见 **[CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)**，可与本文档成对对照。
+
 ## getBankList — 获取银行列表
 
 | 项 | 值 |
@@ -935,3 +937,4 @@ HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/
 - [TESTING.md](./TESTING.md) — 华安直连集成测试
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — getBankList 缓存与转发
 - [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道侧调用说明
+- [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道 → 本服务请求/响应样例

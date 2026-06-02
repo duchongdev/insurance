@@ -77,6 +77,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 - 调用 `huaan.Client.Call`，**不经过** `ProxyService.Forward`、渠道验签、PII 加解密。
 - `getBankList` **直接请求华安**，不走 Redis / `bank_info_t` 缓存。
 - 华安原始响应 JSON 样例见 **[HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)**。
+- 渠道调用本服务的请求/响应样例见 **[CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)**（与华安原文成对对照）。
 - 华安返回的明文 PII 在测试日志中**原样输出**（`t.Log`），不做重新加密。
 - 未配置必填环境变量时，测试 `t.Skip` 跳过。
 - 缺少业务参数（如 `policyId`、`productCode`）的用例单独 `Skip`，补全环境变量后可再跑。
@@ -172,9 +173,11 @@ Authorization: Bearer <token>
 - [ ] `internal/huaan/client_integration_test.go` 增加用例
 - [ ] `api/openapi.yaml` 与 README 同步
 - [ ] 全流程手动验证一条渠道请求
+- [ ] 样例写入 [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)，并与 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 对照
 
 ## 7. 相关文档
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 分层与数据流
 - [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道请求格式
+- [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道请求/响应 JSON 样例
 - [DEPLOY.md](./DEPLOY.md) — 服务部署与配置项

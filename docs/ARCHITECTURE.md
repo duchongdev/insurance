@@ -165,4 +165,6 @@ proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransfor
 
 - [TESTING.md](./TESTING.md) — 如何分别测试华安层与全流程
 - [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道侧接入约定
+- [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道侧请求/响应样例
+- [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) — 华安上游原始 JSON 样例
 - [DEPLOY.md](./DEPLOY.md) — 部署与配置
