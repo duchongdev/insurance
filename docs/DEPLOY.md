@@ -155,7 +155,7 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 │   ├── ARCHITECTURE.md       # 系统架构
 │   ├── TESTING.md            # 测试说明
 │   ├── DEPLOY.md             # 本文件
-│   └── CHANNEL_INTEGRATION.md
+│   └── CHANNEL_API.md
 ├── docker-compose.yml        # 编排 MySQL + Redis + 应用 + Nginx
 ├── deploy/nginx/             # Nginx 反向代理配置
 ├── Dockerfile                # 应用镜像构建
@@ -242,4 +242,4 @@ docker run --rm hello-world
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 系统架构
 - [TESTING.md](./TESTING.md) — 测试与华安直连
-- [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道接入
+- [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档

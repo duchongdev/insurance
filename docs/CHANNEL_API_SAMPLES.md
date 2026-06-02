@@ -1,15 +1,15 @@
 # 渠道接口请求与响应样例
 
-本文档保存**下游渠道商调用本服务**（insurance-bridge）时的 HTTP 请求与响应 JSON，便于联调对照。
+本文档保存**下游渠道商调用本服务**（insurance-bridge）时的 HTTP 请求与响应 JSON，供平台内部联调归档。
 
-与 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 的分工：
+**对外接口说明**（字段定义、签名、错误码、推荐调用顺序）见 **[CHANNEL_API.md](./CHANNEL_API.md)**。
 
-| 文档 | 调用方向 | 签名密钥 | 三要素 | 典型用途 |
-|------|----------|----------|--------|----------|
-| **本文档** | 渠道 → 本服务 → 华安 | 渠道 `channelKey`（请求体 `key`） | 请求/响应中 **AES-256-GCM 密文** | 核对渠道侧看到的报文、验签与加解密 |
-| [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) | 本服务 → 华安（直连） | 华安 `huaAnKey`（由本服务注入） | 直连华安时为 **明文** | 核对上游原始字段与业务错误 |
+与 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 的分工（平台内部）：
 
-同一接口建议在两份文档中**成对维护**：先看本文档的渠道侧报文，再对照华安原文差异。
+| 文档 | 调用方向 | 典型用途 |
+|------|----------|----------|
+| **本文档** | 渠道 → 本服务 | 渠道侧实测 JSON |
+| [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) | 本服务 → 核心业务系统（直连） | 上游原始 JSON 对照 |
 
 ## 通用约定
 
@@ -25,14 +25,14 @@ Content-Type: application/json; charset=utf-8
 | `timestamp` | 毫秒时间戳字符串 |
 | `channelCode` | 管理后台分配的渠道编码 |
 | `key` | 渠道 `channelKey`（**不是**华安 `huaAnKey`） |
-| `sign` | 除 `sign` 外全部参数按 key 升序拼接后 MD5（算法见 [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md)） |
+| `sign` | 除 `sign` 外全部参数按 key 升序拼接后 MD5（算法见 [CHANNEL_API.md](./CHANNEL_API.md)） |
 | `phoneNo` / `name` / `idCard` | 若接口涉及三要素，须 **AES-256-GCM + Base64** 加密后再提交 |
 
 签名示例见 `internal/pkg/sign/sign_test.go`。
 
 ### 响应
 
-- HTTP 状态码一般为 `200`；网关层错误（验签失败、解密失败、华安不可达等）也常以 JSON 返回，见 [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) 错误码表。
+- HTTP 状态码一般为 `200`；网关层错误（验签失败、解密失败等）也常以 JSON 返回，见 [CHANNEL_API.md](./CHANNEL_API.md) 第 5 节。
 - 业务结构与原华安文档一致；响应中三要素字段为本服务加密后的 Base64 密文。
 - 与华安原文的字段差异，在各接口「与华安原文对照」小节说明。
 
@@ -107,7 +107,7 @@ Content-Type: application/json; charset=utf-8
 ```bash
 # 1. 启动本服务（见 docs/TESTING.md §4）
 # 2. 管理后台创建渠道，获得 channelCode、channelKey
-# 3. 按 CHANNEL_INTEGRATION.md 计算 sign 后 POST
+# 3. 按 CHANNEL_API.md 计算 sign 后 POST
 curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d '{"timestamp":"1717300000000","channelCode":"YOUR_CHANNEL_CODE","key":"***","sign":"***"}'
@@ -266,13 +266,13 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
 ## 如何新增 / 更新样例
 
 1. 按 [TESTING.md §4](./TESTING.md#4-全流程测试渠道--本服务--华安) 启动服务并准备渠道凭证。
-2. 构造符合 [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) 的请求，保存**实际**请求与响应 JSON（脱敏后写入本文档）。
+2. 构造符合 [CHANNEL_API.md](./CHANNEL_API.md) 的请求，保存**实际**请求与响应 JSON（脱敏后写入本文档）。
 3. 同一用例在 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 中应有对应华安原文（或注明差异原因，如缓存、网关错误）。
 4. 更新上文「接口索引」中的采集状态与采集时间。
 
 ## 相关文档
 
 - [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) — 华安上游原始 JSON（对照用）
-- [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道签名与三要素加密
+- [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档（对外）
 - [TESTING.md](./TESTING.md) — 全流程测试步骤
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 验签、PII、转发与缓存

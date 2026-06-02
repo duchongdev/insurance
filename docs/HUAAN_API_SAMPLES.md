@@ -936,5 +936,5 @@ HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/
 
 - [TESTING.md](./TESTING.md) — 华安直连集成测试
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — getBankList 缓存与转发
-- [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道侧调用说明
+- [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档
 - [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道 → 本服务请求/响应样例

@@ -139,7 +139,7 @@ POST http://localhost:5051/upChannelApi/getBankList
 Content-Type: application/json; charset=utf-8
 ```
 
-请求体规则见 [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md)：
+请求体规则见 [CHANNEL_API.md](./CHANNEL_API.md)：
 
 - `key` 填 **渠道** `channelKey`
 - `sign` 用渠道密钥计算
@@ -178,6 +178,6 @@ Authorization: Bearer <token>
 ## 7. 相关文档
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 分层与数据流
-- [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道请求格式
+- [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档
 - [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道请求/响应 JSON 样例
 - [DEPLOY.md](./DEPLOY.md) — 服务部署与配置项

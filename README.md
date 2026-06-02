@@ -77,7 +77,7 @@ cp config/config.yaml.example config/config.yaml
 2. 请求体与 `ZF保险.md` 一致，但 `phoneNo`、`name`、`idCard` 需使用本服务配置的 `data_encryption_key` 做 AES-256-GCM 加密后 Base64 传输。
 3. 签名规则与文档一致：参数按 key ASCII 排序拼接 `k=v&...`，MD5 32 位小写；`key` 字段填渠道密钥。
 
-签名示例见单元测试 `internal/pkg/sign/sign_test.go`（与文档示例一致）。详细接入说明见 **[docs/CHANNEL_INTEGRATION.md](./docs/CHANNEL_INTEGRATION.md)**。
+签名示例见单元测试 `internal/pkg/sign/sign_test.go`（与文档示例一致）。渠道商接口文档见 **[docs/CHANNEL_API.md](./docs/CHANNEL_API.md)**。
 
 ## 本地开发
 
@@ -124,7 +124,7 @@ docker-compose.yml
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 渠道层 / 华安层架构 |
 | [docs/TESTING.md](./docs/TESTING.md) | 单元测试、华安直连集成测试 |
 | [docs/DEPLOY.md](./docs/DEPLOY.md) | Docker 交付部署 |
-| [docs/CHANNEL_INTEGRATION.md](./docs/CHANNEL_INTEGRATION.md) | 渠道接入指南 |
+| [docs/CHANNEL_API.md](./docs/CHANNEL_API.md) | 下游渠道商接口文档 |
 
 ## 数据模型
 
