@@ -12,7 +12,9 @@ huaan:
   # 华安上游域名（务必改为生产/测试真实地址）
   base_url: https://xx.xxx.api.york.xin
   api_path: /upChannelApi
-  # 请求华安时是否携带 key 与 sign；true 时按华安规则重签
+  # 请求体 key 字段，默认空字符串
+  key: ""
+  # true 时按华安规则生成 sign；false 时 sign 传空字符串
   sign_enabled: false
 
 database:

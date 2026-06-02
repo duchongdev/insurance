@@ -22,7 +22,7 @@ var ErrTimeout = errors.New("upstream timeout")
 // ErrUnavailable 华安不可达或连接失败。
 var ErrUnavailable = errors.New("upstream unavailable")
 
-// Client 华安上游 HTTP 客户端：换 key、重签、POST、返回原始 JSON。
+// Client 华安上游 HTTP 客户端：写入 key/sign、POST、返回原始 JSON。
 type Client struct {
 	cfg        *config.Config
 	log        *zap.Logger
@@ -47,15 +47,14 @@ type CallResult struct {
 	HuaAnCode  int // 响应 JSON 中 code 字段，解析失败时为 0
 }
 
-// Call 向华安 POST 请求。body 会被原地修改：开启签名时 key 设为 huaAnKey 并重算 sign；关闭时移除 key 与 sign。
-func (c *Client) Call(ctx context.Context, apiPath string, body map[string]interface{}, huaAnKey string) (*CallResult, error) {
+// Call 向华安 POST 请求。body 会被原地修改：始终写入 config 中的 key；开启签名时计算 sign，否则 sign 为空字符串。
+func (c *Client) Call(ctx context.Context, apiPath string, body map[string]interface{}) (*CallResult, error) {
+	body["key"] = c.cfg.HuaAn.Key
 	if c.cfg.HuaAn.SignEnabled {
-		body["key"] = huaAnKey
 		delete(body, "sign")
-		body["sign"] = sign.Build(body, huaAnKey)
+		body["sign"] = sign.Build(body, c.cfg.HuaAn.Key)
 	} else {
-		delete(body, "key")
-		delete(body, "sign")
+		body["sign"] = ""
 	}
 
 	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + c.cfg.HuaAn.APIPath + apiPath
@@ -94,7 +93,7 @@ func (c *Client) Call(ctx context.Context, apiPath string, body map[string]inter
 	return result, nil
 }
 
-// BuildRequestBody 构造带 timestamp、channelCode 的华安请求体（不含 sign）。
+// BuildRequestBody 构造带 timestamp、channelCode 的华安请求体（key/sign 由 Call 注入）。
 func BuildRequestBody(channelCode string, fields map[string]interface{}) map[string]interface{} {
 	body := map[string]interface{}{
 		"timestamp":   fmt.Sprintf("%d", time.Now().UnixMilli()),

@@ -47,6 +47,7 @@ func (e EnvTestConfig) ToAppConfig() *config.Config {
 		HuaAn: config.HuaAnConfig{
 			BaseURL:     e.BaseURL,
 			APIPath:     e.APIPath,
+			Key:         e.HuaAnKey,
 			SignEnabled: false,
 		},
 		Server: config.ServerConfig{UpstreamTimeout: 30 * time.Second},

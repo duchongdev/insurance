@@ -6,7 +6,7 @@
 
 | 层级 | 测什么 | 调用对象 | 是否需要渠道 sign / PII |
 |------|--------|----------|-------------------------|
-| **华安直连** | 本服务 → 华安是否正常 | `huaan.Client.Call`（生产代码） | 否；请求体不含 key/sign；PII 明文发华安 |
+| **华安直连** | 本服务 → 华安是否正常 | `huaan.Client.Call`（生产代码） | 否；body 含 `key`/`sign`（默认可为空）；PII 明文发华安 |
 | **全流程** | 渠道 → 本服务 → 华安 | `POST /upChannelApi/*` | 是 |
 | **单元测试** | 签名、加密、解析等 | `go test ./...` | 依用例而定 |
 
@@ -33,7 +33,7 @@ go test ./... -count=1
 
 ## 3. 华安直连集成测试
 
-验证本服务**真实华安对接代码**（`huaan.Client`）能否正确调用华安 10 个接口。集成测试与生产默认一致：`sign_enabled=false`，请求体**不含** `key` 与 `sign`。
+验证本服务**真实华安对接代码**（`huaan.Client`）能否正确调用华安 10 个接口。请求体始终包含 `key` 与 `sign`：默认 `HUAAN_KEY` 为空、`sign_enabled=false` 时 `sign` 也为空字符串。
 
 ### 3.1 准备环境变量
 
@@ -50,7 +50,7 @@ set -a && source .env.huaan && set +a
 |------|------|------|
 | `HUAAN_BASE_URL` | 是 | 华安域名 |
 | `HUAAN_CHANNEL_CODE` | 是 | 华安侧渠道编码 |
-| `HUAAN_KEY` | 否 | 华安签名密钥；集成测试默认不签名，一般无需设置 |
+| `HUAAN_KEY` | 否 | 对应配置 `huaan.key`，写入请求体 `key` 字段，默认空 |
 | `HUAAN_API_PATH` | 否 | 默认 `/upChannelApi` |
 | `HUAAN_TEST_PHONE` | 含 PII 接口 | 明文手机号 |
 | `HUAAN_TEST_NAME` | 含 PII 接口 | 明文姓名 |
@@ -79,7 +79,8 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 - 华安原始响应 JSON 样例见 **[HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)**。
 - 华安返回的明文 PII 在测试日志中**原样输出**（`t.Log`），不做重新加密。
 - 未配置必填环境变量时，测试 `t.Skip` 跳过。
-- 缺少业务参数（如 `policyId`）的用例单独 `Skip`，补全环境变量后可再跑。
+- 缺少业务参数（如 `policyId`、`productCode`）的用例单独 `Skip`，补全环境变量后可再跑。
+- `proInsurance`、`getProductPricesByProductCode`、`getProductPricesByPolicyId` 集成测试默认带 `hasSocialSecurity: "1"`（华安必填）；后两者还需三要素环境变量。
 
 ### 3.4 覆盖的接口
 
@@ -160,8 +161,8 @@ Authorization: Bearer <token>
 | 场景 | 命令 / 方式 | 验证点 |
 |------|-------------|--------|
 | 签名算法 | `go test ./internal/pkg/sign/...` | 与华安文档示例一致 |
-| 华安 HTTP 客户端 | `go test ./internal/huaan/...` | URL、sign 开关行为 |
-| 华安真实环境 | `make test-huaan` | 10 接口可达、响应可解析（默认无 key/sign） |
+| 华安 HTTP 客户端 | `go test ./internal/huaan/...` | URL、key/sign 注入与 sign 开关 |
+| 华安真实环境 | `make test-huaan` | 10 接口可达、响应可解析 |
 | 渠道全流程 | 手动 / 脚本 POST `/upChannelApi/*` | 验签、PII、转发 |
 | 银行列表缓存 | 全流程 + 管理后台 | Redis / DB 命中不重复打华安 |
 

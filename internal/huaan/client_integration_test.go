@@ -9,10 +9,12 @@ import (
 	"github.com/huaan/insurance-bridge/internal/huaan"
 )
 
-// 华安直连集成测试：调用本服务真实的 huaan.Client，直连华安环境（默认不携带 key/sign）。
+// 华安直连集成测试：调用本服务真实的 huaan.Client，直连华安环境。
 // 运行前设置环境变量，见 .env.huaan.example。
 //
 //	go test -tags=integration ./internal/huaan/ -v -count=1
+const defaultHasSocialSecurity = "1" // 华安报价/投保类接口必填
+
 func TestHuaAnDirect_AllPaths(t *testing.T) {
 	client, env := huaan.NewTestClient(t)
 
@@ -36,8 +38,12 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 		{
 			name:       "getProductPricesByProductCode",
 			path:       "/getProductPricesByProductCode",
+			needPII:    true,
 			needFields: true,
-			fields:     map[string]interface{}{"productCode": os.Getenv("HUAAN_TEST_PRODUCT_CODE")},
+			fields: map[string]interface{}{
+				"productCode":        os.Getenv("HUAAN_TEST_PRODUCT_CODE"),
+				"hasSocialSecurity": defaultHasSocialSecurity,
+			},
 		},
 		{
 			name:       "getPolicyInfoByPhoneNo",
@@ -54,15 +60,22 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 		{
 			name:       "getProductPricesByPolicyId",
 			path:       "/getProductPricesByPolicyId",
+			needPII:    true,
 			needFields: true,
-			fields:     map[string]interface{}{"policyId": os.Getenv("HUAAN_TEST_POLICY_ID")},
+			fields: map[string]interface{}{
+				"policyId":           os.Getenv("HUAAN_TEST_POLICY_ID"),
+				"hasSocialSecurity": defaultHasSocialSecurity,
+			},
 		},
 		{
 			name:       "proInsurance",
 			path:       "/proInsurance",
 			needPII:    true,
 			needFields: true,
-			fields:     map[string]interface{}{"productCode": os.Getenv("HUAAN_TEST_PRODUCT_CODE")},
+			fields: map[string]interface{}{
+				"productCode":        os.Getenv("HUAAN_TEST_PRODUCT_CODE"),
+				"hasSocialSecurity": defaultHasSocialSecurity,
+			},
 		},
 		{
 			name:       "upGradeIns",
@@ -107,7 +120,7 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 			}
 
 			body := huaan.BuildRequestBody(env.ChannelCode, fields)
-			result, err := client.Call(t.Context(), tc.path, body, env.HuaAnKey)
+			result, err := client.Call(t.Context(), tc.path, body)
 			if err != nil {
 				t.Fatalf("Call %s: %v", tc.path, err)
 			}

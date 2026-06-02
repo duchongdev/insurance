@@ -13,15 +13,14 @@ import (
 )
 
 func TestClient_Call(t *testing.T) {
-	testClientCall(t, true)
+	testClientCall(t, true, "test-huaan-key")
 }
 
 func TestClient_Call_NoSign(t *testing.T) {
-	testClientCall(t, false)
+	testClientCall(t, false, "")
 }
 
-func testClientCall(t *testing.T, signEnabled bool) {
-	const huaAnKey = "test-huaan-key"
+func testClientCall(t *testing.T, signEnabled bool, cfgKey string) {
 	var gotPath string
 	var gotBody map[string]interface{}
 
@@ -38,6 +37,7 @@ func testClientCall(t *testing.T, signEnabled bool) {
 		HuaAn: config.HuaAnConfig{
 			BaseURL:     srv.URL,
 			APIPath:     "/upChannelApi",
+			Key:         cfgKey,
 			SignEnabled: signEnabled,
 		},
 		Server: config.ServerConfig{UpstreamTimeout: 5 * time.Second},
@@ -47,30 +47,25 @@ func testClientCall(t *testing.T, signEnabled bool) {
 	body := BuildRequestBody("CH001", map[string]interface{}{
 		"phoneNo": "13800138000",
 		"name":    "张三",
-		"key":     "channel-key-should-be-removed",
-		"sign":    "old-sign-should-be-removed",
+		"key":     "channel-key-should-be-overwritten",
+		"sign":    "old-sign-should-be-overwritten",
 	})
-	result, err := client.Call(t.Context(), "/getProductInfoByChannel", body, huaAnKey)
+	result, err := client.Call(t.Context(), "/getProductInfoByChannel", body)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if gotPath != "/upChannelApi/getProductInfoByChannel" {
 		t.Fatalf("path=%s", gotPath)
 	}
+	if gotBody["key"] != cfgKey {
+		t.Fatalf("key=%v want=%q", gotBody["key"], cfgKey)
+	}
 	if signEnabled {
-		if gotBody["key"] != huaAnKey {
-			t.Fatalf("key=%v", gotBody["key"])
-		}
-		if !sign.Verify(sign.MapFromJSON(gotBody), huaAnKey) {
+		if !sign.Verify(sign.MapFromJSON(gotBody), cfgKey) {
 			t.Fatal("upstream sign verify failed")
 		}
-	} else {
-		if _, ok := gotBody["key"]; ok {
-			t.Fatalf("key should be omitted, got %v", gotBody["key"])
-		}
-		if _, ok := gotBody["sign"]; ok {
-			t.Fatalf("sign should be omitted, got %v", gotBody["sign"])
-		}
+	} else if gotBody["sign"] != "" {
+		t.Fatalf("sign=%v want empty string", gotBody["sign"])
 	}
 	if result.HuaAnCode != 200 {
 		t.Fatalf("huaanCode=%d", result.HuaAnCode)

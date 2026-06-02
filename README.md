@@ -54,7 +54,8 @@ cp config/config.yaml.example config/config.yaml
 | `BRIDGE_REDIS_PASSWORD` | Redis 认证密码（Docker 部署由 `REDIS_PASSWORD` 自动同步） |
 | `BRIDGE_REDIS_BANK_LIST_TTL` | 银行列表缓存 TTL，默认 `0`（不过期） |
 | `BRIDGE_HUAAN_BASE_URL` | 华安域名 |
-| `BRIDGE_HUAAN_SIGN_ENABLED` | 请求华安时是否携带 `key` 与 `sign`，默认 `false`；设为 `true` 时按华安规则重签 |
+| `BRIDGE_HUAAN_KEY` | 请求华安时 body 中的 `key` 字段，默认空字符串 |
+| `BRIDGE_HUAAN_SIGN_ENABLED` | 是否按华安规则生成 `sign`；默认 `false`（`sign` 传空字符串） |
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，渠道三要素 AES 加解密 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT |
 | `BRIDGE_SERVER_UPSTREAM_TIMEOUT` | 华安调用超时，默认 25s |

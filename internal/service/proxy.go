@@ -60,7 +60,7 @@ func (s *ProxyService) HuaAnClient() *huaan.Client {
 
 // Forward 处理单次渠道 API 调用。
 // 约定：HTTP 状态码恒为 200，业务成败由 JSON body 的 code 字段表达（与华安/渠道文档一致）。
-// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 华安 Client.Call → 加密响应字段。
+// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 华安 Client.Call（key/sign 由 huaan 配置注入）→ 加密响应字段。
 func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []byte) ([]byte, int, error) {
 	traceID := uuid.New().String()
 	var body map[string]interface{}
@@ -101,7 +101,7 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		return s.errorResponse(400, "pii decrypt failed"), http.StatusOK, nil
 	}
 
-	result, err := s.huaan.Call(ctx, apiPath, body, ch.HuaAnKey)
+	result, err := s.huaan.Call(ctx, apiPath, body)
 	if err != nil {
 		s.log.Warn("upstream failed",
 			zap.String("traceId", traceID),
@@ -141,17 +141,14 @@ func (s *ProxyService) GetCachedBankList(ctx context.Context, channelCode string
 	return s.bankListCache.Get(ctx, channelCode)
 }
 
-// RefreshBankList 管理后台手动请求华安 /getBankList，使用调用方提供的渠道码与华安密钥。
-func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKey string) ([]byte, error) {
+// RefreshBankList 管理后台手动请求华安 /getBankList；key/sign 由配置 huaan.key、huaan.sign_enabled 决定。
+func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode string) ([]byte, error) {
 	if channelCode == "" {
 		return nil, errors.New("channelCode required")
 	}
-	if s.cfg.HuaAn.SignEnabled && huaAnKey == "" {
-		return nil, errors.New("huaAnKey required when huaan sign enabled")
-	}
 
 	body := huaan.BuildRequestBody(channelCode, nil)
-	result, err := s.huaan.Call(ctx, huaan.BankListPath, body, huaAnKey)
+	result, err := s.huaan.Call(ctx, huaan.BankListPath, body)
 	if err != nil {
 		if errors.Is(err, huaan.ErrTimeout) {
 			return nil, errors.New("upstream timeout")

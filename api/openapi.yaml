@@ -188,7 +188,10 @@ paths:
               required: [channelCode]
               properties:
                 channelCode: { type: string, description: 渠道编码 }
-                huaAnKey: { type: string, description: 华安签名密钥；huaan.sign_enabled=true 时必填 }
+                huaAnKey:
+                  type: string
+                  deprecated: true
+                  description: 已废弃；上游 key 由服务端 config huaan.key 配置
       responses:
         '200':
           description: 华安 getBankList 原始响应
