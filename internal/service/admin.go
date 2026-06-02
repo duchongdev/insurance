@@ -13,11 +13,10 @@ import (
 // ErrInvalidCredentials 登录或 JWT 校验失败时返回。
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
-// AdminService 管理后台业务：认证、渠道 CRUD 与抽取数据的分页查询。
+// AdminService 管理后台业务：认证、渠道 CRUD 与银行信息查询。
 type AdminService struct {
 	admins    *repository.AdminRepo
 	channels  *repository.ChannelRepo
-	biz       *repository.BusinessRepo
 	banks     *repository.BankRepo
 	jwtSecret []byte
 }
@@ -26,14 +25,12 @@ type AdminService struct {
 func NewAdminService(
 	admins *repository.AdminRepo,
 	channels *repository.ChannelRepo,
-	biz *repository.BusinessRepo,
 	banks *repository.BankRepo,
 	jwtSecret string,
 ) *AdminService {
 	return &AdminService{
 		admins:    admins,
 		channels:  channels,
-		biz:       biz,
 		banks:     banks,
 		jwtSecret: []byte(jwtSecret),
 	}
@@ -110,44 +107,6 @@ func (s *AdminService) DeleteChannel(id uint64) error {
 // GetChannel 按 ID 查询单条渠道。
 func (s *AdminService) GetChannel(id uint64) (*model.Channel, error) {
 	return s.channels.GetByID(id)
-}
-
-// Stats 聚合保单、用户、签约数量；channelCode 非空时按渠道过滤。
-func (s *AdminService) Stats(channelCode string) (map[string]interface{}, error) {
-	return s.biz.Stats(channelCode)
-}
-
-// ListPolicies 分页查询保单抽取记录。
-func (s *AdminService) ListPolicies(channelCode string, page, size int) ([]model.PolicyRecord, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size <= 0 {
-		size = 20
-	}
-	return s.biz.ListPolicies(channelCode, (page-1)*size, size)
-}
-
-// ListUsers 分页查询用户抽取记录。
-func (s *AdminService) ListUsers(channelCode string, page, size int) ([]model.UserRecord, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size <= 0 {
-		size = 20
-	}
-	return s.biz.ListUsers(channelCode, (page-1)*size, size)
-}
-
-// ListSigns 分页查询签约抽取记录。
-func (s *AdminService) ListSigns(channelCode string, page, size int) ([]model.SignRecord, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if size <= 0 {
-		size = 20
-	}
-	return s.biz.ListSigns(channelCode, (page-1)*size, size)
 }
 
 // ListBanks 分页查询银行信息；status 为 0 表示不限。

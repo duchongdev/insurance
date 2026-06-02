@@ -1,4 +1,4 @@
-// Package model 定义 GORM 持久化实体，对应渠道配置、接口审计日志及从华安响应抽取的业务快照。
+// Package model 定义 GORM 持久化实体：渠道配置、管理员账号与银行信息。
 package model
 
 import "time"
@@ -25,63 +25,7 @@ type AdminUser struct {
 	UpdatedAt    time.Time
 }
 
-// UserRecord 用户三要素快照（库内 AES 加密），由 /verifyNoCode 等接口响应抽取。
-type UserRecord struct {
-	ID          uint64    `gorm:"primaryKey" json:"id"`
-	ChannelCode string    `gorm:"uniqueIndex:idx_channel_user;size:64;not null" json:"channelCode"` // 渠道 + 用户唯一
-	UserID      string    `gorm:"uniqueIndex:idx_channel_user;size:64" json:"userId"`               // 华安 userid
-	PhoneEnc    string    `gorm:"size:512" json:"-"`                                                // 手机号密文
-	NameEnc     string    `gorm:"size:512" json:"-"`                                                // 姓名密文
-	IDCardEnc   string    `gorm:"size:512" json:"-"`                                                // 身份证号密文
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-// PolicyRecord 保单信息快照，由投保、查询、升级等接口响应抽取。
-type PolicyRecord struct {
-	ID              uint64    `gorm:"primaryKey" json:"id"`
-	ChannelCode     string    `gorm:"index;size:64;not null" json:"channelCode"`
-	PolicyID        string    `gorm:"uniqueIndex;size:64;not null" json:"policyId"` // 华安 policyId，全局唯一
-	PolicyNo        string    `gorm:"size:64" json:"policyNo"`                      // 保单号
-	UserID          string    `gorm:"index;size:64" json:"userId"`
-	ProductCode     string    `gorm:"size:64" json:"productCode"`
-	ProductID       string    `gorm:"size:64" json:"productId"`
-	PolicyStatus    string    `gorm:"size:8" json:"policyStatus"`   // 保单状态码
-	PolicyStartDate string    `gorm:"size:32" json:"policyStartDate"` // 起保日
-	PolicyEndDate   string    `gorm:"size:32" json:"policyEndDate"`   // 终保日
-	PayPremium      string    `gorm:"size:32" json:"payPremium"`      // 保费（字符串保持与上游一致）
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
-}
-
-// SignRecord 签约/代扣链接记录，由 /getSignUrl 响应抽取。
-type SignRecord struct {
-	ID           uint64    `gorm:"primaryKey" json:"id"`
-	ChannelCode  string    `gorm:"index;size:64;not null" json:"channelCode"`
-	SignID       string    `gorm:"index;size:64" json:"signId"`       // 签约流水号
-	PolicyID     string    `gorm:"index;size:64" json:"policyId"`     // 关联保单
-	BankCode     string    `gorm:"size:32" json:"bankCode"`           // 银行编码
-	CardType     string    `gorm:"size:32" json:"cardType"`           // 卡类型
-	PayChannelID string    `gorm:"size:64" json:"payChannelId"`       // 支付渠道
-	SignURL      string    `gorm:"size:1024" json:"signUrl,omitempty"` // 签约 H5 地址
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
-}
-
-// ProductRecord 渠道产品目录快照，由产品列表/报价接口抽取。
-type ProductRecord struct {
-	ID          uint64    `gorm:"primaryKey"`
-	ChannelCode string    `gorm:"uniqueIndex:idx_channel_product;size:64;not null"`
-	ProductCode string    `gorm:"uniqueIndex:idx_channel_product;size:64;not null"`
-	ProductName string    `gorm:"size:128"`
-	ProductID   string    `gorm:"size:64"`
-	ProductType string    `gorm:"size:32"`
-	Price       string    `gorm:"size:32"` // 最近报价
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-// BankInfo 银行信息，对应 bank_info_t；由华安 getBankList 响应同步或管理后台维护。
+// BankInfo 银行信息，对应 bank_info_t；由华安 getBankList 响应同步。
 type BankInfo struct {
 	ID         uint64    `gorm:"primaryKey;column:id" json:"id"`
 	BankCode   string    `gorm:"column:bank_code;uniqueIndex;size:64;not null" json:"bankCode"`
@@ -95,15 +39,3 @@ type BankInfo struct {
 
 // TableName 指定 GORM 表名。
 func (BankInfo) TableName() string { return "bank_info_t" }
-
-// PaymentRecord 报价/支付流水（只增），用于统计各接口产生的价格记录。
-type PaymentRecord struct {
-	ID          uint64    `gorm:"primaryKey"`
-	ChannelCode string    `gorm:"index;size:64;not null"`
-	PolicyID    string    `gorm:"index;size:64"`
-	SignID      string    `gorm:"index;size:64"`
-	ProductCode string    `gorm:"size:64"`
-	Price       string    `gorm:"size:32"`
-	SourceAPI   string    `gorm:"size:128"` // 产生记录的接口路径
-	CreatedAt   time.Time
-}

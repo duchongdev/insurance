@@ -12,9 +12,6 @@ const activeMenu = computed(() => route.path)
 const menuItems = [
   { path: '/dashboard', title: '概览', icon: 'Odometer' },
   { path: '/channels', title: '渠道管理', icon: 'Connection' },
-  { path: '/policies', title: '保单', icon: 'Document' },
-  { path: '/users', title: '用户', icon: 'User' },
-  { path: '/signs', title: '签约', icon: 'EditPen' },
   { path: '/banks', title: '银行列表', icon: 'Money' },
 ]
 

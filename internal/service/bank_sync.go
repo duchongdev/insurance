@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/repository"
@@ -128,4 +129,17 @@ func toInt8(v interface{}) int8 {
 		}
 	}
 	return 0
+}
+
+func str(v interface{}) string {
+	switch t := v.(type) {
+	case string:
+		return t
+	case float64:
+		return strconv.FormatInt(int64(t), 10)
+	case json.Number:
+		return t.String()
+	default:
+		return ""
+	}
 }

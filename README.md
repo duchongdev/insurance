@@ -1,14 +1,14 @@
 # 华安保险渠道对接服务 (insurance-bridge)
 
-华安与下游渠道商之间的中间层：渠道调用本服务，本服务验签、解密用户三要素后转发华安，华安响应原样返回（三要素字段对渠道加密）。同时落库请求/响应及业务实体，供管理后台统计与对账。
+华安与下游渠道商之间的中间层：渠道调用本服务，本服务验签、解密用户三要素后转发华安，华安响应原样返回（三要素字段对渠道加密）。当前阶段**仅做透明转发**，不落库接口请求/响应及业务快照。
 
 ## 功能概览
 
 - **渠道 API**：完整实现 `ZF保险.md` 中 `/upChannelApi` 下 10 个接口
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
-- **数据落库**：用户、保单、签约、产品、付费流水、银行信息（`bank_info_t`）；渠道 API 调用详情写入服务日志文件
-- **管理后台**：Vue 3 + Element Plus（`web/admin/`），Nginx 托管 `/admin/`，REST API 在 `/admin/api`
+- **银行列表**：`getBankList` 支持 Redis → `bank_info_t` → 华安 多级缓存；管理后台可查询与手动刷新
+- **管理后台**：Vue 3 + Element Plus（`web/admin/`），渠道配置、银行列表、管理员登录
 - **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化服务日志（轮转、gzip 归档、90 天自动清理）
 
 ## 快速启动
@@ -54,7 +54,7 @@ cp config/config.yaml.example config/config.yaml
 | `BRIDGE_REDIS_PASSWORD` | Redis 认证密码（Docker 部署由 `REDIS_PASSWORD` 自动同步） |
 | `BRIDGE_REDIS_BANK_LIST_TTL` | 银行列表缓存 TTL，默认 `0`（不过期） |
 | `BRIDGE_HUAAN_BASE_URL` | 华安域名 |
-| `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，三要素与库内敏感字段 |
+| `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，渠道三要素 AES 加解密 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT |
 | `BRIDGE_SERVER_UPSTREAM_TIMEOUT` | 华安调用超时，默认 25s |
 | `BRIDGE_LOG_LEVEL` | 服务日志级别：`debug`（测试）/ `info`（生产） |
@@ -65,7 +65,7 @@ cp config/config.yaml.example config/config.yaml
 ### 服务日志
 
 - 路径：`./logs/app.log`（Docker 映射至宿主机 `logs/`）
-- 渠道 API 调用：`info` 记录摘要（traceId、渠道、路径、响应码、耗时）；`debug` 记录脱敏请求与华安响应全文
+- 渠道 API 调用：`info` 记录摘要（traceId、渠道、路径、响应码、耗时），**不记录**请求/响应 body
 - 轮转：lumberjack 按文件大小轮转，旧文件 gzip 压缩；超过 `retention_days` 自动删除
 - 每日 03:00 额外扫描 `logs/` 清理遗留过期文件
 
@@ -104,7 +104,7 @@ cmd/server/          # Go 主程序
 web/admin/           # 管理后台 Vue 前端（Element Plus）
 internal/
   handler/           # HTTP 处理器
-  service/           # 代理、抽取、管理服务
+  service/           # 代理、管理服务
   repository/        # 数据访问
   model/             # 数据模型
   pkg/sign,cipher,pii,redis
@@ -118,8 +118,7 @@ docker-compose.yml
 | 表 | 用途 |
 |----|------|
 | channels | 渠道与双密钥映射 |
-| user_records | 用户（加密存储） |
-| policy_records | 保单 |
-| sign_records | 签约 |
-| product_records | 产品 |
-| payment_records | 价格/付费流水 |
+| admin_users | 管理后台登录账号 |
+| bank_info_t | 银行列表（getBankList 同步） |
+
+已有部署若仍存在历史表（如 `user_records`、`policy_records`、`api_request_logs` 等），代码已不再使用，可按需手动 `DROP TABLE` 清理。

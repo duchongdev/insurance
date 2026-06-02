@@ -69,7 +69,6 @@ func main() {
 
 	// --- 仓储与首次启动 Seed ---
 	channelRepo := repository.NewChannelRepo(db)
-	bizRepo := repository.NewBusinessRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
 	bankRepo := repository.NewBankRepo(db)
 
@@ -78,11 +77,10 @@ func main() {
 	}
 
 	// --- 业务服务 ---
-	extractor := service.NewExtractor(bizRepo, crypter)
 	piiTransformer := pii.NewTransformer(crypter)
 	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, extractor, piiTransformer, bankListCache)
-	adminSvc := service.NewAdminService(adminRepo, channelRepo, bizRepo, bankRepo, cfg.Security.JWTSecret)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransformer, bankListCache)
+	adminSvc := service.NewAdminService(adminRepo, channelRepo, bankRepo, cfg.Security.JWTSecret)
 
 	// --- HTTP 路由 ---
 	gin.SetMode(cfg.Server.Mode)

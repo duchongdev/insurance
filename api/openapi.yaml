@@ -4,7 +4,7 @@ info:
   description: |
     渠道商调用本服务，本服务验签、解密三要素后转发华安，并将华安响应原样返回（三要素字段加密）。
     管理后台 API 需 Bearer Token。
-  version: 1.0.0
+  version: 1.1.0
 servers:
   - url: http://localhost:5051
 paths:
@@ -127,11 +127,6 @@ paths:
       tags: [管理后台]
       security: [{ bearerAuth: [] }]
       summary: 创建渠道
-  /admin/api/stats:
-    get:
-      tags: [管理后台]
-      security: [{ bearerAuth: [] }]
-      summary: 统计概览
   /admin/api/banks:
     get:
       tags: [管理后台]

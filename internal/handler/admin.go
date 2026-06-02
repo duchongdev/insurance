@@ -9,7 +9,7 @@ import (
 	"github.com/huaan/insurance-bridge/internal/service"
 )
 
-// AdminHandler 管理后台 REST API：登录、渠道 CRUD、业务数据分页查询。
+// AdminHandler 管理后台 REST API：登录、渠道 CRUD、银行信息查询与刷新。
 type AdminHandler struct {
 	admin *service.AdminService
 	proxy *service.ProxyService
@@ -25,14 +25,10 @@ func (h *AdminHandler) Register(r *gin.RouterGroup) {
 	r.POST("/login", h.login)
 	auth := r.Group("")
 	auth.Use(h.authMiddleware)
-	auth.GET("/stats", h.stats)
 	auth.GET("/channels", h.listChannels)
 	auth.POST("/channels", h.createChannel)
 	auth.PUT("/channels/:id", h.updateChannel)
 	auth.DELETE("/channels/:id", h.deleteChannel)
-	auth.GET("/policies", h.listPolicies)
-	auth.GET("/users", h.listUsers)
-	auth.GET("/signs", h.listSigns)
 	auth.GET("/banks", h.listBanks)
 	auth.POST("/bank-list/refresh", h.refreshBankList)
 	auth.GET("/bank-list", h.getBankList)
@@ -71,16 +67,6 @@ func (h *AdminHandler) login(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"token": token})
-}
-
-// stats 按渠道（可选 channelCode 查询参数）聚合保单/用户/签约/日志数量。
-func (h *AdminHandler) stats(c *gin.Context) {
-	stats, err := h.admin.Stats(c.Query("channelCode"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, stats)
 }
 
 // listChannels 分页列出渠道配置。
@@ -135,30 +121,6 @@ func (h *AdminHandler) deleteChannel(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-// listPolicies 分页查询抽取的保单记录。
-func (h *AdminHandler) listPolicies(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	list, total, err := h.admin.ListPolicies(c.Query("channelCode"), page, size)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
-}
-
-// listUsers 分页查询用户记录（三要素为库内密文）。
-func (h *AdminHandler) listUsers(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	list, total, err := h.admin.ListUsers(c.Query("channelCode"), page, size)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
-}
-
 // refreshBankList 使用指定渠道码与华安密钥请求上游 getBankList。
 func (h *AdminHandler) refreshBankList(c *gin.Context) {
 	var req struct {
@@ -198,18 +160,6 @@ func (h *AdminHandler) getBankList(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "application/json; charset=utf-8", data)
-}
-
-// listSigns 分页查询签约记录。
-func (h *AdminHandler) listSigns(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	list, total, err := h.admin.ListSigns(c.Query("channelCode"), page, size)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"list": list, "total": total})
 }
 
 // listBanks 分页查询 bank_info_t 银行信息。

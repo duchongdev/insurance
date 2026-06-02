@@ -1,61 +1,49 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { fetchStats, type Stats } from '@/api/admin'
+import { fetchBanks, fetchChannels } from '@/api/admin'
 
 const loading = ref(false)
-const channelCode = ref('')
-const stats = ref<Stats>({
-  policyCount: 0,
-  userCount: 0,
-  signCount: 0,
-})
+const channelCount = ref(0)
+const bankCount = ref(0)
 
-async function loadStats() {
+async function loadOverview() {
   loading.value = true
   try {
-    const { data } = await fetchStats(channelCode.value.trim() || undefined)
-    stats.value = data
+    const [channels, banks] = await Promise.all([
+      fetchChannels(1, 1),
+      fetchBanks(1, 1),
+    ])
+    channelCount.value = channels.data.total || 0
+    bankCount.value = banks.data.total || 0
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadStats)
+onMounted(loadOverview)
 </script>
 
 <template>
   <el-card shadow="never">
     <template #header>
-      <div class="card-header">
-        <span>数据概览</span>
-        <div class="filters">
-          <el-input v-model="channelCode" placeholder="渠道编码（可选）" clearable style="width: 200px" />
-          <el-button type="primary" :loading="loading" @click="loadStats">查询</el-button>
-        </div>
-      </div>
+      <span>概览</span>
     </template>
     <el-row :gutter="16" v-loading="loading">
       <el-col :span="8">
-        <el-statistic title="保单" :value="stats.policyCount" />
+        <el-statistic title="渠道数量" :value="channelCount" />
       </el-col>
       <el-col :span="8">
-        <el-statistic title="用户" :value="stats.userCount" />
-      </el-col>
-      <el-col :span="8">
-        <el-statistic title="签约" :value="stats.signCount" />
+        <el-statistic title="银行数量" :value="bankCount" />
       </el-col>
     </el-row>
+    <p class="hint">本服务当前阶段仅做渠道 API 透明转发；渠道配置与银行列表可在左侧菜单维护。</p>
   </el-card>
 </template>
 
 <style scoped>
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.filters {
-  display: flex;
-  gap: 8px;
+.hint {
+  margin-top: 24px;
+  color: #909399;
+  font-size: 14px;
 }
 </style>
