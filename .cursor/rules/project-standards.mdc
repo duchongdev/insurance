@@ -40,10 +40,11 @@ handler → service → repository → model
 
 ## Git 提交
 
+- **提交前 Code Review（强制）**：执行 `git commit` 前必须先走 skill **`pre-commit-review`**（`.cursor/skills/pre-commit-review/SKILL.md`）。满分 100、**及格 60**；不及格 **禁止提交**，须按报告改造建议修复后重新 review。
 - **一功能 / 一问题一提交（原子性）**：同一 commit 只包含解决**同一个 bug** 或完成**同一项功能**的改动；无关文件不要混在同一提交。
   - 示例：`fix(admin)` 只含管理后台修复，不含部署脚本；`feat(deploy)` 只含交付与部署相关文件。
   - 改 OpenAPI 时同步的 README 属于同一功能，可放在同一 commit（见下文「文档与接口同步」）。
-- **修复或功能完成后自动提交**：Agent 完成 bug 修复、功能实现或用户明确要求的变更后，**应主动执行 `git commit`**，无需用户再次提醒；提交前用 `git status` / `git diff` 确认仅包含本次原子变更。
+- **修复或功能完成后自动提交**：Agent 完成 bug 修复、功能实现或用户明确要求的变更后，**应主动执行 `git commit`**，无需用户再次提醒；提交前用 `git status` / `git diff` 确认仅包含本次原子变更，且 **pre-commit-review 已通过**。
 - **标题与说明优先中文**；模块名、路径、命令可中英混写。
 - 示例：
   - `fix(proxy): 修复渠道验签失败时未落审计日志`
