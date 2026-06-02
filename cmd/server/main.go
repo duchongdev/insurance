@@ -79,7 +79,7 @@ func main() {
 	// --- 业务服务 ---
 	piiTransformer := pii.NewTransformer(crypter)
 	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransformer, bankListCache)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransformer, bankListCache, nil)
 	adminSvc := service.NewAdminService(adminRepo, channelRepo, bankRepo, cfg.Security.JWTSecret)
 
 	// --- HTTP 路由 ---

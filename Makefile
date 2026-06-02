@@ -1,4 +1,4 @@
-.PHONY: tidy test build run package install start stop deploy-test admin-build admin-dev
+.PHONY: tidy test test-huaan build run package install start stop deploy-test admin-build admin-dev
 
 GOPROXY ?= https://goproxy.io,direct
 GOSUMDB ?= sum.golang.org
@@ -14,6 +14,10 @@ tidy:
 
 test: tidy
 	go test ./...
+
+# 华安直连集成测试（需设置 HUAAN_BASE_URL、HUAAN_CHANNEL_CODE、HUAAN_KEY，见 docs/TESTING.md）
+test-huaan:
+	go test -tags=integration ./internal/huaan/ -v -count=1
 
 build: tidy
 	go build -o bin/bridge ./cmd/server

@@ -2,18 +2,15 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/huaan/insurance-bridge/internal/config"
+	"github.com/huaan/insurance-bridge/internal/huaan"
 	"github.com/huaan/insurance-bridge/internal/pkg/pii"
 	rediscache "github.com/huaan/insurance-bridge/internal/pkg/redis"
 	"github.com/huaan/insurance-bridge/internal/pkg/sign"
@@ -21,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ProxyService 渠道 API 代理核心：验签 → 解密三要素 → 换华安 key 重签 → 转发 → 加密响应。
+// ProxyService 渠道 API 代理：渠道层（验签、PII）编排 + 华安层（HuaAnClient）转发。
 type ProxyService struct {
 	cfg           *config.Config
 	log           *zap.Logger
@@ -29,10 +26,10 @@ type ProxyService struct {
 	banks         *repository.BankRepo
 	pii           *pii.Transformer
 	bankListCache *rediscache.BankListCache
-	httpClient    *http.Client
+	huaan         *huaan.Client
 }
 
-// NewProxyService 构造代理服务，httpClient 超时取自配置 upstream_timeout。
+// NewProxyService 构造代理服务；huaanClient 为 nil 时自动创建默认华安客户端。
 func NewProxyService(
 	cfg *config.Config,
 	log *zap.Logger,
@@ -40,7 +37,11 @@ func NewProxyService(
 	banks *repository.BankRepo,
 	piiTransformer *pii.Transformer,
 	bankListCache *rediscache.BankListCache,
+	huaanClient *huaan.Client,
 ) *ProxyService {
+	if huaanClient == nil {
+		huaanClient = huaan.NewClient(cfg, log, nil)
+	}
 	return &ProxyService{
 		cfg:           cfg,
 		log:           log,
@@ -48,15 +49,18 @@ func NewProxyService(
 		banks:         banks,
 		pii:           piiTransformer,
 		bankListCache: bankListCache,
-		httpClient: &http.Client{
-			Timeout: cfg.Server.UpstreamTimeout,
-		},
+		huaan:         huaanClient,
 	}
+}
+
+// HuaAnClient 返回华安上游客户端，供集成测试或管理任务直接调用。
+func (s *ProxyService) HuaAnClient() *huaan.Client {
+	return s.huaan
 }
 
 // Forward 处理单次渠道 API 调用。
 // 约定：HTTP 状态码恒为 200，业务成败由 JSON body 的 code 字段表达（与华安/渠道文档一致）。
-// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 替换华安 key 并重签 → POST 上游 → 加密响应字段。
+// 流程：解析 JSON → 校验 channelCode/key/sign → 解密 PII → 华安 Client.Call → 加密响应字段。
 func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []byte) ([]byte, int, error) {
 	traceID := uuid.New().String()
 	var body map[string]interface{}
@@ -83,7 +87,7 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		return s.errorResponse(401, "sign verify failed"), http.StatusOK, nil
 	}
 
-	if apiPath == bankListAPIPath {
+	if apiPath == huaan.BankListPath {
 		if out, ok := s.respondBankListFromCache(ctx, traceID, channelCode); ok {
 			return out, http.StatusOK, nil
 		}
@@ -97,51 +101,25 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		return s.errorResponse(400, "pii decrypt failed"), http.StatusOK, nil
 	}
 
-	body["key"] = ch.HuaAnKey
-	delete(body, "sign")
-	body["sign"] = sign.Build(body, ch.HuaAnKey)
-
-	upstreamURL := s.cfg.HuaAn.BaseURL + s.cfg.HuaAn.APIPath + apiPath
-	reqBytes, _ := json.Marshal(body)
-
-	start := time.Now()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upstreamURL, bytes.NewReader(reqBytes))
-	if err != nil {
-		return s.errorResponse(500, "build upstream request failed"), http.StatusOK, err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := s.httpClient.Do(req)
-	duration := time.Since(start).Milliseconds()
+	result, err := s.huaan.Call(ctx, apiPath, body, ch.HuaAnKey)
 	if err != nil {
 		s.log.Warn("upstream failed",
 			zap.String("traceId", traceID),
 			zap.String("channelCode", channelCode),
 			zap.String("apiPath", apiPath),
-			zap.Int64("durationMs", duration),
 			zap.Error(err),
 		)
-		if ctx.Err() != nil {
+		if errors.Is(err, huaan.ErrTimeout) {
 			return s.errorResponse(504, "upstream timeout"), http.StatusOK, nil
 		}
 		return s.errorResponse(502, "upstream unavailable"), http.StatusOK, err
 	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return s.errorResponse(500, "read upstream response failed"), http.StatusOK, err
-	}
 
 	var respBody map[string]interface{}
-	_ = json.Unmarshal(respBytes, &respBody)
-	huaanCode := 0
-	if c, ok := respBody["code"].(float64); ok {
-		huaanCode = int(c)
-	}
+	_ = json.Unmarshal(result.Body, &respBody)
 
-	if apiPath == bankListAPIPath {
-		s.cacheBankList(ctx, channelCode, respBytes)
+	if apiPath == huaan.BankListPath {
+		s.cacheBankList(ctx, channelCode, result.Body)
 	}
 
 	_ = s.pii.EncryptResponse(respBody)
@@ -151,14 +129,12 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		zap.String("traceId", traceID),
 		zap.String("channelCode", channelCode),
 		zap.String("apiPath", apiPath),
-		zap.Int("huaanCode", huaanCode),
-		zap.Int64("durationMs", duration),
+		zap.Int("huaanCode", result.HuaAnCode),
+		zap.Int64("durationMs", result.DurationMs),
 	)
 
 	return out, http.StatusOK, nil
 }
-
-const bankListAPIPath = "/getBankList"
 
 // GetCachedBankList 返回 Redis 中华安原始响应 JSON；未命中时 data 为 nil。
 func (s *ProxyService) GetCachedBankList(ctx context.Context, channelCode string) ([]byte, error) {
@@ -171,43 +147,21 @@ func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode, huaAnKe
 		return nil, errors.New("channelCode and huaAnKey required")
 	}
 
-	body := map[string]interface{}{
-		"timestamp":   fmt.Sprintf("%d", time.Now().UnixMilli()),
-		"channelCode": channelCode,
-		"key":         huaAnKey,
-	}
-	body["sign"] = sign.Build(body, huaAnKey)
-
-	upstreamURL := s.cfg.HuaAn.BaseURL + s.cfg.HuaAn.APIPath + bankListAPIPath
-	reqBytes, _ := json.Marshal(body)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, upstreamURL, bytes.NewReader(reqBytes))
+	body := huaan.BuildRequestBody(channelCode, nil)
+	result, err := s.huaan.Call(ctx, huaan.BankListPath, body, huaAnKey)
 	if err != nil {
-		return nil, fmt.Errorf("build upstream request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		if ctx.Err() != nil {
+		if errors.Is(err, huaan.ErrTimeout) {
 			return nil, errors.New("upstream timeout")
 		}
-		return nil, fmt.Errorf("upstream unavailable: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read upstream response: %w", err)
+		return nil, err
 	}
 
-	s.cacheBankList(ctx, channelCode, respBytes)
-
-	return respBytes, nil
+	s.cacheBankList(ctx, channelCode, result.Body)
+	return result.Body, nil
 }
 
 func (s *ProxyService) cacheBankList(ctx context.Context, channelCode string, respBytes []byte) {
-	if !huaAnResponseOK(respBytes) {
+	if !huaan.ResponseOK(respBytes) {
 		return
 	}
 	if err := s.bankListCache.Set(ctx, channelCode, respBytes); err != nil {
@@ -284,10 +238,7 @@ func (s *ProxyService) respondBankListFromCache(ctx context.Context, traceID, ch
 	if err := json.Unmarshal(cached, &respBody); err != nil {
 		return nil, false
 	}
-	huaanCode := 0
-	if c, ok := respBody["code"].(float64); ok {
-		huaanCode = int(c)
-	}
+	huaanCode := huaan.ParseCode(cached)
 	_ = s.pii.EncryptResponse(respBody)
 	out, _ := json.Marshal(respBody)
 
@@ -297,15 +248,6 @@ func (s *ProxyService) respondBankListFromCache(ctx context.Context, traceID, ch
 		zap.Int("huaanCode", huaanCode),
 	)
 	return out, true
-}
-
-func huaAnResponseOK(respBytes []byte) bool {
-	var resp map[string]interface{}
-	if err := json.Unmarshal(respBytes, &resp); err != nil {
-		return false
-	}
-	code, ok := resp["code"].(float64)
-	return ok && int(code) == 200
 }
 
 // errorResponse 构造桥接层错误 JSON（code/message/data），供渠道解析。

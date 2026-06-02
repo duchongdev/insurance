@@ -4,6 +4,7 @@ bin/
 bridge
 dist/
 .env
+.env.huaan
 config/config.yaml
 .DS_Store
 .idea/

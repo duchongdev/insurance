@@ -62,3 +62,9 @@ Go 示例见 `internal/pkg/cipher/cipher.go`。
 | 504 | 调用华安超时 |
 
 业务错误仍以华安返回的 `code`、`message` 为准。
+
+## 7. 相关文档
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — 系统架构与分层
+- [TESTING.md](./TESTING.md) — 测试说明
+- [DEPLOY.md](./DEPLOY.md) — 部署与配置

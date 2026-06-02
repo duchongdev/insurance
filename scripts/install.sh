@@ -76,7 +76,7 @@ if [[ -n "${CREATED_ENV:-}" || -n "${CREATED_CFG:-}" || "$NEED_EDIT" -eq 1 ]]; t
   echo "  - .env"
   echo "  - config/config.yaml"
   echo
-  info "详细说明见 DEPLOY.md"
+  info "详细说明见 docs/DEPLOY.md"
   exit 0
 fi
 

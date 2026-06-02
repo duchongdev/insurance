@@ -56,4 +56,4 @@ cd /home/ins
 - 部署相关命令默认针对测试机 `root@10.41.61.41:/home/ins`。
 - 用户说「部署 / 部署测试 / 测试环境 / 更新测试环境 / 更新远程服务器」等，或要求「改造完自动更新服务器」时，同样执行 **deploy-test** skill 与 `make deploy-test`。
 - 不要将在 `.env` 中的密钥、密码写入规则或提交 Git。
-- 详细用户手册见根目录 `DEPLOY.md`。
+- 详细用户手册见 `docs/DEPLOY.md`。

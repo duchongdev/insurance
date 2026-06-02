@@ -24,7 +24,7 @@ chmod +x scripts/*.sh
 ./scripts/start.sh
 ```
 
-详细步骤见 **[DEPLOY.md](./DEPLOY.md)**。交付方打包容器：
+详细步骤见 **[docs/DEPLOY.md](./docs/DEPLOY.md)**。更多文档见 **[docs/README.md](./docs/README.md)**（架构、测试、渠道接入）。交付方打包容器：
 
 ```bash
 make package   # 输出 dist/insurance-bridge-*.tar.gz
@@ -75,7 +75,7 @@ cp config/config.yaml.example config/config.yaml
 2. 请求体与 `ZF保险.md` 一致，但 `phoneNo`、`name`、`idCard` 需使用本服务配置的 `data_encryption_key` 做 AES-256-GCM 加密后 Base64 传输。
 3. 签名规则与文档一致：参数按 key ASCII 排序拼接 `k=v&...`，MD5 32 位小写；`key` 字段填渠道密钥。
 
-签名示例见单元测试 `internal/pkg/sign/sign_test.go`（与文档示例一致）。
+签名示例见单元测试 `internal/pkg/sign/sign_test.go`（与文档示例一致）。详细接入说明见 **[docs/CHANNEL_INTEGRATION.md](./docs/CHANNEL_INTEGRATION.md)**。
 
 ## 本地开发
 
@@ -105,13 +105,24 @@ web/admin/           # 管理后台 Vue 前端（Element Plus）
 internal/
   handler/           # HTTP 处理器
   service/           # 代理、管理服务
+  huaan/             # 华安上游 HTTP 客户端
   repository/        # 数据访问
   model/             # 数据模型
   pkg/sign,cipher,pii,redis
+docs/                # 项目文档（架构、测试、部署、渠道接入）
 api/openapi.yaml
 deploy/nginx/        # Nginx：/admin/ 静态 + API 反代
 docker-compose.yml
 ```
+
+## 文档
+
+| 文档 | 说明 |
+|------|------|
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 渠道层 / 华安层架构 |
+| [docs/TESTING.md](./docs/TESTING.md) | 单元测试、华安直连集成测试 |
+| [docs/DEPLOY.md](./docs/DEPLOY.md) | Docker 交付部署 |
+| [docs/CHANNEL_INTEGRATION.md](./docs/CHANNEL_INTEGRATION.md) | 渠道接入指南 |
 
 ## 数据模型
 

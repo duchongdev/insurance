@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/huaan/insurance-bridge/internal/huaan"
 	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/repository"
 )
 
 // ReplaceBanksFromResponse 解析华安 getBankList 响应并全量覆盖 bank_info_t。
 func ReplaceBanksFromResponse(banks *repository.BankRepo, respBytes []byte) error {
-	if !huaAnResponseOK(respBytes) {
+	if !huaan.ResponseOK(respBytes) {
 		return nil
 	}
 	var resp map[string]interface{}

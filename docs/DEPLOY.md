@@ -150,7 +150,12 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 
 ```
 .
-├── DEPLOY.md                 # 本文件
+├── docs/
+│   ├── README.md             # 文档索引
+│   ├── ARCHITECTURE.md       # 系统架构
+│   ├── TESTING.md            # 测试说明
+│   ├── DEPLOY.md             # 本文件
+│   └── CHANNEL_INTEGRATION.md
 ├── docker-compose.yml        # 编排 MySQL + Redis + 应用 + Nginx
 ├── deploy/nginx/             # Nginx 反向代理配置
 ├── Dockerfile                # 应用镜像构建
@@ -166,8 +171,9 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 │   └── package.sh            # 交付方打包容器（开发用）
 └── logs/                     # 应用日志目录
 ```
----
+
 ## 一键安装 Docker 24.0.9（24.0.x 最新稳定小版本）
+
 ```
 # 卸载旧版本（如果有）
 yum remove -y docker docker-client docker-client-latest docker-common docker-latest docker-latest-logrotate docker-logrotate docker-engine
@@ -188,7 +194,9 @@ systemctl enable docker
 # 验证安装
 docker --version 
 ```
-##  一键安装 Docker Compose V2 2.24.5（和 Docker 24.0.x 最兼容、企业用得最多）。docker compose up -d（无横线）。
+
+## 一键安装 Docker Compose V2 2.24.5（和 Docker 24.0.x 最兼容、企业用得最多）。docker compose up -d（无横线）。
+
 ```
 # 下载 Docker Compose 最新稳定版
 curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -204,6 +212,7 @@ docker-compose --version
 ```
 
 ## 配置阿里云镜像加速（必须配置，否则拉取镜像极慢）
+
 ```
 # 创建 docker 配置目录
 mkdir -p /etc/docker
@@ -224,7 +233,13 @@ systemctl restart docker
 ```
 
 ## 测试是否安装成功（跑一个 hello-world）
+
 ```
 docker run --rm hello-world
 ```
 
+## 相关文档
+
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — 系统架构
+- [TESTING.md](./TESTING.md) — 测试与华安直连
+- [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) — 渠道接入
