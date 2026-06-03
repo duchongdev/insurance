@@ -46,12 +46,12 @@ Content-Type: application/json; charset=utf-8
 |------|------|--------|----------|
 | getBankList | `/upChannelApi/getBankList` | 否 | 待采集 |
 | getProductInfoByChannel | `/upChannelApi/getProductInfoByChannel` | 否 | 待采集 |
-| proInsurance | `/upChannelApi/proInsurance` | 是 | 待采集 |
+| proInsurance | `/upChannelApi/proInsurance` | 是 | 2026-06-02（华安样例已对齐） |
 | upGradeIns | `/upChannelApi/upGradeIns` | 否 | 待采集 |
 | getSignUrl | `/upChannelApi/getSignUrl` | 否 | 待采集 |
 | verifyNoCode | `/upChannelApi/verifyNoCode` | 是 | 待采集 |
 | getPolicyInfoByPhoneNo | `/upChannelApi/getPolicyInfoByPhoneNo` | 是 | 待采集 |
-| getProductPricesByProductCode | `/upChannelApi/getProductPricesByProductCode` | 否 | 待采集 |
+| getProductPricesByProductCode | `/upChannelApi/getProductPricesByProductCode` | 是 | 2026-06-02（华安样例已对齐） |
 | getProductPricesByPolicyId | `/upChannelApi/getProductPricesByPolicyId` | 否 | 待采集 |
 | getPolicyInfoByPolicyId | `/upChannelApi/getPolicyInfoByPolicyId` | 否 | 待采集 |
 
@@ -145,22 +145,53 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
 | 项 | 值 |
 |----|-----|
 | 路径 | `POST {平台域名}/upChannelApi/proInsurance` |
-| 采集时间 | — |
+| 采集时间 | 2026-06-02 |
 | 对照华安样例 | [HUAAN_API_SAMPLES.md#proinsurance--投保](./HUAAN_API_SAMPLES.md#proinsurance--投保) |
+
+`productCode` 来自 `getProductInfoByChannel`；字段结构与华安一致，渠道侧三要素须 AES-GCM 密文。
 
 ### 请求体（渠道 → 本服务）
 
-> 待采集。`phoneNo`、`name`、`idCard` 须为加密 Base64，非明文。
+与华安字段相同，三要素为密文（示例结构）：
+
+```json
+{
+  "timestamp": "1780456222458",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "YOUR_CHANNEL_KEY",
+  "sign": "YOUR_SIGN",
+  "productCode": "ZFHLW1041001",
+  "hasSocialSecurity": "1",
+  "phoneNo": "Base64密文(手机号)",
+  "name": "Base64密文(姓名)",
+  "idCard": "Base64密文(身份证号)"
+}
+```
 
 ### 响应体（本服务 → 渠道）
 
-> 待采集。
+`data` 与华安一致（本接口响应无 PII 需加密字段）：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "policyId": "9697d878b6474c619fa43ffa9ca3b4b0",
+    "policyStatus": "0",
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab"
+  }
+}
+```
+
+`productCode=ZFHLW1040003` 时实测 `policyId` 为 `ab185a401820431aad4be32c329ab003`，见华安样例文档。
 
 ### 与华安原文对照
 
 | 差异点 | 渠道侧 | 华安原文 |
 |--------|--------|----------|
-| 三要素 | 请求密文、响应密文 | 明文 |
+| 三要素 | 请求须密文 | 明文（直连华安） |
+| `data` 字段 | `policyId` / `policyStatus` / `userId` 一致 | 同上 |
 | 网关错误 | 可能出现 `401`/`400` 等本服务错误码 | 无 |
 
 ---
@@ -226,12 +257,62 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
 | 项 | 值 |
 |----|-----|
 | 路径 | `POST {平台域名}/upChannelApi/getProductPricesByProductCode` |
-| 采集时间 | — |
-| 对照华安样例 | [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)（对应章节） |
+| 采集时间 | 2026-06-02 |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getproductpricesbyproductcode--查询产品价格](./HUAAN_API_SAMPLES.md#getproductpricesbyproductcode--查询产品价格) |
 
-### 请求体 / 响应体
+`productCode` 来自 `getProductInfoByChannel`；须带 `hasSocialSecurity` 与三要素。
 
-> 待采集。
+### 请求体（渠道 → 本服务）
+
+```json
+{
+  "timestamp": "1780456222050",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "YOUR_CHANNEL_KEY",
+  "sign": "YOUR_SIGN",
+  "productCode": "ZFHLW1041001",
+  "hasSocialSecurity": "1",
+  "phoneNo": "Base64密文(手机号)",
+  "name": "Base64密文(姓名)",
+  "idCard": "Base64密文(身份证号)"
+}
+```
+
+### 响应体（本服务 → 渠道）
+
+`data` 数组与华安一致（无 PII 字段）：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "productCode": "ZFHLW1041001",
+      "productId": "cc55f8cff47a4f0d88da3a9ca057772a",
+      "price": 0.65,
+      "productName": "百万医疗险-体验版",
+      "productType": "1"
+    },
+    {
+      "productCode": "ZFBWYL1038002",
+      "productId": "fade25f092f44d2088fe8d7eeba4d493",
+      "price": 150.8,
+      "productName": "百万医疗险-正式版",
+      "productType": "2"
+    }
+  ]
+}
+```
+
+`productCode=ZFHLW1040003` 时响应见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md#getproductpricesbyproductcode--查询产品价格)。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 三要素 | 请求须密文 | 明文 |
+| `data[]` 结构 | 与华安相同 | 体验版 + 正式版两条报价 |
 
 ---
 

@@ -259,35 +259,35 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 | 项 | 值 |
 |----|-----|
 | 路径 | `POST {HUAAN_BASE_URL}/upChannelApi/proInsurance` |
-| 采集时间 | 2026-06-02 |
+| 采集时间 | 2026-06-02（`TestHuaAnDirect_ProductFromChannel` 直连实测） |
 | 环境 | `https://zf.ins.api.york.xin/` |
 | 渠道编码 | `I7fZcM` |
 | 签名 | 关闭（`sign_enabled=false`，`key`/`sign` 均为空字符串） |
 
-`productCode` 取自上文 [getProductInfoByChannel](#getproductinfobychannel--渠道查询产品) 响应，分别实测一次。**实测须传 `hasSocialSecurity`**（如 `"1"`），否则返回 500。
+`productCode` 取自上文 [getProductInfoByChannel](#getproductinfobychannel--渠道查询产品) 响应（集成测试自动解析，无需配置 `HUAAN_TEST_PRODUCT_CODE`）。**须传 `hasSocialSecurity`**（如 `"1"`），否则返回 500。成功时 `policyId` 每次投保新生成。
 
-### 请求体示例（成功用例）
+### 请求体示例（成功用例，华安直连明文三要素）
 
 ```json
 {
-  "timestamp": "1717300000000",
+  "timestamp": "1780456222458",
   "channelCode": "I7fZcM",
   "key": "",
   "sign": "",
   "productCode": "ZFHLW1041001",
-  "phoneNo": "***",
-  "name": "***",
-  "idCard": "***",
+  "phoneNo": "13811045503",
+  "name": "杜冲",
+  "idCard": "13068319940517031X",
   "hasSocialSecurity": "1"
 }
 ```
 
-| 请求字段 | 实测值 | 说明 |
-|----------|--------|------|
-| `productCode` | 见下表各用例 | 来自 getProductInfoByChannel |
-| `phoneNo` | `***` | 明文（直连华安，非渠道加密） |
-| `name` | `***` | 同上 |
-| `idCard` | `***` | 同上 |
+| 请求字段 | 实测值（示例） | 说明 |
+|----------|----------------|------|
+| `productCode` | `ZFHLW1041001` / `ZFHLW1040003` | 来自 getProductInfoByChannel |
+| `phoneNo` | `13811045503` | 明文（直连华安；经本服务转发时须 AES 密文） |
+| `name` | `杜冲` | 同上 |
+| `idCard` | `13068319940517031X` | 同上 |
 | `hasSocialSecurity` | `"1"` | 是否有社保；未传时华安解析为 `null` 并报价格规则错误 |
 
 ### 未传 hasSocialSecurity 时的响应（失败）
@@ -321,7 +321,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "code": 200,
   "message": "操作成功",
   "data": {
-    "policyId": "2c61ea7a04bb4b91a688ff1bf1b04dc4",
+    "policyId": "9697d878b6474c619fa43ffa9ca3b4b0",
     "policyStatus": "0",
     "userId": "5c819c252ab343e2a2a6df98b3a014ab"
   }
@@ -335,7 +335,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "code": 200,
   "message": "操作成功",
   "data": {
-    "policyId": "91a51cc70e724d4885ac2e27530099ec",
+    "policyId": "ab185a401820431aad4be32c329ab003",
     "policyStatus": "0",
     "userId": "5c819c252ab343e2a2a6df98b3a014ab"
   }
@@ -357,13 +357,14 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 
 ```bash
 set -a && source .env.huaan && set +a
-export HUAAN_TEST_PHONE="***"
-export HUAAN_TEST_NAME="***"
-export HUAAN_TEST_ID_CARD="***"
-# 联调时将上述 *** 替换为真实三要素
+export HUAAN_TEST_PHONE="13811045503"
+export HUAAN_TEST_NAME="杜冲"
+export HUAAN_TEST_ID_CARD="13068319940517031X"
 
-HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/ -v -count=1 \
-  -run 'TestHuaAnDirect_AllPaths/proInsurance'
+go test -tags=integration ./internal/huaan/ -v -count=1 \
+  -run 'TestHuaAnDirect_ProductFromChannel/ZFHLW1041001/proInsurance'
+# 或跑渠道下全部产品的报价+投保：
+# go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_ProductFromChannel
 ```
 
 ## verifyNoCode — 无验证码实名
@@ -545,35 +546,35 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 | 项 | 值 |
 |----|-----|
 | 路径 | `POST {HUAAN_BASE_URL}/upChannelApi/getProductPricesByProductCode` |
-| 采集时间 | 2026-06-02 |
+| 采集时间 | 2026-06-02（`TestHuaAnDirect_ProductFromChannel` 直连实测） |
 | 环境 | `https://zf.ins.api.york.xin/` |
 | 渠道编码 | `I7fZcM` |
 | 签名 | 关闭（`sign_enabled=false`，`key`/`sign` 均为空字符串） |
 
-`productCode` 取自上文 [getProductInfoByChannel](#getproductinfobychannel--渠道查询产品) 响应。实测除 `productCode` 外还需三要素及 `hasSocialSecurity`；仅传 `productCode` 时返回 `601`。
+`productCode` 取自上文 [getProductInfoByChannel](#getproductinfobychannel--渠道查询产品) 响应。实测除 `productCode` 外还需三要素及 `hasSocialSecurity`；仅传 `productCode` 时返回 `601`。成功时 `data` 为**数组**，通常含体验版（`productType: "1"`）与正式版（`productType: "2"`）两条报价。
 
-### 请求体示例（成功用例）
+### 请求体示例（成功用例，华安直连明文三要素）
 
 ```json
 {
-  "timestamp": "1717300000000",
+  "timestamp": "1780456222050",
   "channelCode": "I7fZcM",
   "key": "",
   "sign": "",
   "productCode": "ZFHLW1041001",
-  "phoneNo": "***",
-  "name": "***",
-  "idCard": "***",
+  "phoneNo": "13811045503",
+  "name": "杜冲",
+  "idCard": "13068319940517031X",
   "hasSocialSecurity": "1"
 }
 ```
 
-| 请求字段 | 实测值 | 说明 |
-|----------|--------|------|
-| `productCode` | 见下表各用例 | 来自 getProductInfoByChannel |
-| `phoneNo` | `***` | 明文（直连华安） |
-| `name` | `***` | 同上 |
-| `idCard` | `***` | 同上 |
+| 请求字段 | 实测值（示例） | 说明 |
+|----------|----------------|------|
+| `productCode` | `ZFHLW1041001` / `ZFHLW1040003` | 来自 getProductInfoByChannel |
+| `phoneNo` | `13811045503` | 明文（直连华安；经本服务转发时须 AES 密文） |
+| `name` | `杜冲` | 同上 |
+| `idCard` | `13068319940517031X` | 同上 |
 | `hasSocialSecurity` | `"1"` | 是否有社保；未传时华安可能报「未找到价格规则… hasSocialSecurity=null」 |
 
 ### 仅 productCode 时的响应（失败）
@@ -605,7 +606,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
     {
       "productCode": "ZFBWYL1038002",
       "productId": "fade25f092f44d2088fe8d7eeba4d493",
-      "price": 150.80,
+      "price": 150.8,
       "productName": "百万医疗险-正式版",
       "productType": "2"
     }
@@ -655,13 +656,14 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 
 ```bash
 set -a && source .env.huaan && set +a
-export HUAAN_TEST_PHONE="***"
-export HUAAN_TEST_NAME="***"
-export HUAAN_TEST_ID_CARD="***"
-# 联调时将上述 *** 替换为真实三要素；集成测试已默认 hasSocialSecurity=1
+export HUAAN_TEST_PHONE="13811045503"
+export HUAAN_TEST_NAME="杜冲"
+export HUAAN_TEST_ID_CARD="13068319940517031X"
 
-HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/ -v -count=1 \
-  -run 'TestHuaAnDirect_AllPaths/getProductPricesByProductCode'
+go test -tags=integration ./internal/huaan/ -v -count=1 \
+  -run 'TestHuaAnDirect_ProductFromChannel/ZFHLW1041001/getProductPricesByProductCode'
+# 或跑渠道下全部产品的报价+投保：
+# go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_ProductFromChannel
 ```
 
 ## upGradeIns — 升级险种
@@ -722,7 +724,11 @@ HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/
 | 渠道编码 | `I7fZcM` |
 | 签名 | 关闭 |
 
-`policyId` 来自 proInsurance；`bankCode`/`cardType` 取自 [getBankList](#getbanklist--获取银行列表) 第一组（BOC，`cardType=1` 表示储蓄卡）；`userId` 来自 [verifyNoCode](#verifynocode--无验证码实名)。
+`policyId` 来自 proInsurance；`userId` 来自 [verifyNoCode](#verifynocode--无验证码实名)。
+
+**`bankCode` 与 `payChannelId` 必须配套**：二者取自 [getBankList](#getbanklist--获取银行列表) **同一条** `data[]` 记录，不得将 A 银行的 `bankCode` 与 B 银行的 `payChannelId` 组合。`cardType` 与所选银行的 `debitCard`/`creditCard` 能力一致（储蓄卡 `"1"`，信用卡 `"2"`）。
+
+集成测试 `TestHuaAnDirect_GetSignUrl` 会先调 `getBankList` 再调 `getSignUrl`，并在 `-v` 日志中输出两次请求与响应。
 
 ### 请求体示例
 
@@ -734,6 +740,7 @@ HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/
   "sign": "",
   "policyId": "91a51cc70e724d4885ac2e27530099ec",
   "bankCode": "BOC",
+  "payChannelId": "4bf5dd6ece6847e68ee6c5d4345afee4",
   "cardType": "1",
   "userId": "5c819c252ab343e2a2a6df98b3a014ab",
   "phoneNo": "***",
@@ -741,6 +748,15 @@ HUAAN_TEST_PRODUCT_CODE=ZFHLW1041001 go test -tags=integration ./internal/huaan/
   "idCard": "***"
 }
 ```
+
+### 仅测 getSignUrl（华安直连）
+
+```bash
+set -a && source .env.huaan && set +a
+go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_GetSignUrl
+```
+
+环境变量见 [TESTING.md](./TESTING.md) 第 3.6 节。
 
 ### 响应体（华安原始 JSON）
 

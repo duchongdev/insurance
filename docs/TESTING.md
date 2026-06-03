@@ -55,8 +55,9 @@ set -a && source .env.huaan && set +a
 | `HUAAN_TEST_PHONE` | 含 PII 接口 | 明文手机号 |
 | `HUAAN_TEST_NAME` | 含 PII 接口 | 明文姓名 |
 | `HUAAN_TEST_ID_CARD` | 含 PII 接口 | 明文身份证号 |
-| `HUAAN_TEST_PRODUCT_CODE` | 部分接口 | 产品编码 |
-| `HUAAN_TEST_POLICY_ID` | 部分接口 | 保单 ID |
+| `HUAAN_TEST_USER_ID` | 否 | 仅当 `proInsurance` 未返回 `userId` 时，`getSignUrl` 测试备用 |
+
+`productCode`、`policyId` **无需配置**：集成测试分别从 `getProductInfoByChannel`、`proInsurance` 响应解析（与生产一致——`policyId` 由下游请求携带，本服务只转发）。
 
 `.env.huaan` 已加入 `.gitignore`，**勿提交**。
 
@@ -80,7 +81,8 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 - 渠道调用本服务的请求/响应样例见 **[CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)**（与华安原文成对对照）。
 - 华安返回的明文 PII 在测试日志中**原样输出**（`t.Log`），不做重新加密。
 - 未配置必填环境变量时，测试 `t.Skip` 跳过。
-- 缺少业务参数（如 `policyId`、`productCode`）的用例单独 `Skip`，补全环境变量后可再跑。
+- `getProductPricesByProductCode`、`proInsurance` 的 `productCode` **自动**从 `getProductInfoByChannel` 获取（`TestHuaAnDirect_ProductFromChannel`）。
+- 依赖 `policyId` 的接口（`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`upGradeIns`、`getSignUrl`）在测试中 **先调 proInsurance** 取 `policyId`（`TestHuaAnDirect_PolicyFromProInsurance`、`TestHuaAnDirect_GetSignUrl`）。
 - `proInsurance`、`getProductPricesByProductCode`、`getProductPricesByPolicyId` 集成测试默认带 `hasSocialSecurity: "1"`（华安必填）；后两者还需三要素环境变量。
 
 ### 3.4 覆盖的接口
@@ -91,7 +93,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 |------|------|
 | `/proInsurance` | 投保 |
 | `/upGradeIns` | 升级险种 |
-| `/getSignUrl` | 获取签约链接 |
+| `/getSignUrl` | 获取签约链接（须 `payChannelId`，见 **3.6** 专项测试） |
 | `/verifyNoCode` | 无验证码实名 |
 | `/getPolicyInfoByPhoneNo` | 按手机号查保单 |
 | `/getProductPricesByProductCode` | 按产品编码报价 |
@@ -104,12 +106,49 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 
 ### 3.5 建议先跑通的接口
 
-无需额外业务参数，配置好三个必填变量即可：
+无需额外业务参数，配置好 `HUAAN_BASE_URL`、`HUAAN_CHANNEL_CODE` 即可：
 
 - `/getBankList`
 - `/getProductInfoByChannel`
 
-其余接口需补充 `HUAAN_TEST_*` 业务参数。
+含 PII 的接口需配置 `HUAAN_TEST_PHONE` / `NAME` / `ID_CARD`。
+
+### 3.6 产品报价与投保（先 getProductInfoByChannel）
+
+`getProductPricesByProductCode`、`proInsurance` 依赖的 `productCode` 来自 **`getProductInfoByChannel` 响应**（字段说明见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)），与文档样例一致，例如 `ZFHLW1041001`、`ZFHLW1040003`。
+
+```bash
+go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_ProductFromChannel
+```
+
+对渠道返回的**每个**产品各跑一遍报价与投保子测试，日志中会打印选用的 `productCode` / `productName`。
+
+### 3.7 依赖 policyId 的接口（先 proInsurance）
+
+`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`upGradeIns` 的 `policyId` 来自 **`proInsurance` 成功响应的 `data.policyId`**，无需 `HUAAN_TEST_POLICY_ID`。
+
+```bash
+go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_PolicyFromProInsurance
+```
+
+流程：getProductInfoByChannel → proInsurance → 用返回的 `policyId` 调上述三个接口。
+
+### 3.8 getSignUrl 专项测试
+
+`policyId` 来自 **proInsurance**；`bankCode` + `payChannelId` 来自 **同一条 getBankList** 记录；`userId` 优先取自 proInsurance 响应。
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `HUAAN_TEST_PHONE` / `NAME` / `ID_CARD` | 是 | 三要素明文 |
+| `HUAAN_TEST_BANK_CODE` | 否 | 指定银行；未设置用列表第一条 |
+| `HUAAN_TEST_CARD_TYPE` | 否 | 默认按银行能力推导 |
+| `HUAAN_TEST_USER_ID` | 否 | 仅 proInsurance 未返回 userId 时使用 |
+
+```bash
+go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_GetSignUrl
+```
+
+实现见 `internal/huaan/client_integration_test.go`、`internal/huaan/banklist.go`、`internal/huaan/proinsurance.go`。
 
 ## 4. 全流程测试（渠道 → 本服务 → 华安）
 

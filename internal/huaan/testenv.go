@@ -61,20 +61,42 @@ func NewTestClient(t *testing.T) (*Client, EnvTestConfig) {
 	return NewClient(env.ToAppConfig(), nil, nil), env
 }
 
+// LogRequest 输出即将发往华安的请求体（Call 注入 key/sign 之前的状态；含已组装的业务字段）。
+func LogRequest(t *testing.T, apiPath string, body map[string]interface{}) {
+	t.Helper()
+	t.Logf("=== 请求 %s ===", apiPath)
+	logJSON(t, "请求体", body)
+}
+
 // LogResponse 原样输出华安 JSON 响应（明文 PII，不做加密）。
 func LogResponse(t *testing.T, apiPath string, result *CallResult) {
 	t.Helper()
-	t.Logf("=== %s ===", apiPath)
+	t.Logf("=== 响应 %s ===", apiPath)
 	t.Logf("durationMs: %d, huaanCode: %d", result.DurationMs, result.HuaAnCode)
+	logJSONBytes(t, "华安响应", result.Body)
+}
+
+func logJSON(t *testing.T, label string, v interface{}) {
+	t.Helper()
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		t.Logf("%s: %+v", label, v)
+		return
+	}
+	t.Logf("%s:\n%s", label, b)
+}
+
+func logJSONBytes(t *testing.T, label string, raw []byte) {
+	t.Helper()
 	var pretty json.RawMessage
-	if err := json.Unmarshal(result.Body, &pretty); err != nil {
-		t.Logf("华安响应(raw): %s", result.Body)
+	if err := json.Unmarshal(raw, &pretty); err != nil {
+		t.Logf("%s(raw): %s", label, raw)
 		return
 	}
 	indented, err := json.MarshalIndent(pretty, "", "  ")
 	if err != nil {
-		t.Logf("华安响应: %s", result.Body)
+		t.Logf("%s: %s", label, raw)
 		return
 	}
-	t.Logf("华安响应:\n%s", indented)
+	t.Logf("%s:\n%s", label, indented)
 }

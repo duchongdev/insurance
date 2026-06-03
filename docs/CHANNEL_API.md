@@ -9,12 +9,14 @@
 
 ## 1. 接入准备
 
-| 项 | 说明 |
-|----|------|
-| 平台域名 | 由运营提供，如 `https://your-bridge.example.com` |
-| `channelCode` | 渠道编码，管理后台创建渠道后分配 |
-| `channelKey` | 渠道签名密钥，写入请求体 `key` 字段，参与 `sign` 计算 |
+
+| 项                   | 说明                                          |
+| ------------------- | ------------------------------------------- |
+| 平台域名                | 由运营提供，如 `https://your-bridge.example.com`   |
+| `channelCode`       | 渠道编码，管理后台创建渠道后分配                            |
+| `channelKey`        | 渠道签名密钥，写入请求体 `key` 字段，参与 `sign` 计算          |
 | `dataEncryptionKey` | 32 字节 UTF-8 字符串，与平台约定，用于三要素 AES-256-GCM 加解密 |
+
 
 接入流程：
 
@@ -28,46 +30,56 @@
 
 ### 2.1 请求
 
-| 项 | 值 |
-|----|-----|
-| 方法 | `POST` |
-| URL | `{平台域名}/upChannelApi/{接口路径}` |
+
+| 项      | 值                                               |
+| ------ | ----------------------------------------------- |
+| 方法     | `POST`                                          |
+| URL    | `{平台域名}/upChannelApi/{接口路径}`                    |
 | Header | `Content-Type: application/json; charset=utf-8` |
-| Body | JSON 对象 |
+| Body   | JSON 对象                                         |
+
 
 ### 2.2 公共请求字段
 
 除各接口业务字段外，**每个接口**均需携带：
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `timestamp` | string | 是 | 毫秒时间戳，如 `"1780402912417"` |
-| `channelCode` | string | 是 | 平台分配的渠道编码 |
-| `key` | string | 是 | 平台分配的 `channelKey` |
-| `sign` | string | 是 | 按第 3 节规则计算的 MD5 签名，32 位小写十六进制 |
+
+| 字段            | 类型     | 必填  | 说明                            |
+| ------------- | ------ | --- | ----------------------------- |
+| `timestamp`   | string | 是   | 毫秒时间戳，如 `"1780402912417"`     |
+| `channelCode` | string | 是   | 平台分配的渠道编码                     |
+| `key`         | string | 是   | 平台分配的 `channelKey`            |
+| `sign`        | string | 是   | 按第 3 节规则计算的 MD5 签名，32 位小写十六进制 |
+
 
 ### 2.3 响应
 
-| 项 | 说明 |
-|----|------|
-| HTTP 状态码 | 一般为 `200`（含业务失败、网关错误时也多为 200） |
-| Body | JSON：`{ "code", "message", "data" }` |
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `code` | integer | `200` 表示业务成功；其他为失败（含平台网关错误码，见第 5 节） |
-| `message` | string | 提示或错误原因 |
-| `data` | object / array / null | 业务数据，结构因接口而异 |
+| 项        | 说明                                   |
+| -------- | ------------------------------------ |
+| HTTP 状态码 | 一般为 `200`（含业务失败、网关错误时也多为 200）        |
+| Body     | JSON：`{ "code", "message", "data" }` |
+
+
+
+| 字段        | 类型                    | 说明                                  |
+| --------- | --------------------- | ----------------------------------- |
+| `code`    | integer               | `200` 表示业务成功；其他为失败（含平台网关错误码，见第 5 节） |
+| `message` | string                | 提示或错误原因                             |
+| `data`    | object / array / null | 业务数据，结构因接口而异                        |
+
 
 ### 2.4 用户三要素（PII）
 
 以下字段在**请求**中须使用 `dataEncryptionKey` 做 **AES-256-GCM** 加密后 **Base64** 编码再提交：
 
-| 字段 | 说明 |
-|------|------|
-| `phoneNo` | 手机号 |
-| `name` | 姓名 |
-| `idCard` | 身份证号 |
+
+| 字段        | 说明   |
+| --------- | ---- |
+| `phoneNo` | 手机号  |
+| `name`    | 姓名   |
+| `idCard`  | 身份证号 |
+
 
 **加密格式**：
 
@@ -119,18 +131,20 @@ isSignType=0&key=c7ae4fc06ca25a73b96fbe2d199e1819&phoneNo=13968526776&signSerial
 
 ## 4. 接口一览
 
-| 序号 | 接口路径 | 说明 | 三要素 |
-|------|----------|------|--------|
-| 1 | `/getBankList` | 获取银行列表 | 否 |
-| 2 | `/getProductInfoByChannel` | 查询渠道可售产品 | 否 |
-| 3 | `/getProductPricesByProductCode` | 按产品编码查价格 | 是 |
-| 4 | `/verifyNoCode` | 无验证码实名 | 是 |
-| 5 | `/proInsurance` | 预投保 | 是 |
-| 6 | `/upGradeIns` | 保单升级 | 否 |
-| 7 | `/getSignUrl` | 获取签约链接 | 是 |
-| 8 | `/getPolicyInfoByPhoneNo` | 按手机号查保单 | 是 |
-| 9 | `/getProductPricesByPolicyId` | 按保单 ID 查价格 | 是 |
-| 10 | `/getPolicyInfoByPolicyId` | 按保单 ID 查详情 | 否 |
+
+| 序号  | 接口路径                             | 说明         | 三要素 |
+| --- | -------------------------------- | ---------- | --- |
+| 1   | `/getBankList`                   | 获取银行列表     | 否   |
+| 2   | `/getProductInfoByChannel`       | 查询渠道可售产品   | 否   |
+| 3   | `/getProductPricesByProductCode` | 按产品编码查价格   | 是   |
+| 4   | `/verifyNoCode`                  | 无验证码实名     | 是   |
+| 5   | `/proInsurance`                  | 预投保        | 是   |
+| 6   | `/upGradeIns`                    | 保单升级       | 否   |
+| 7   | `/getSignUrl`                    | 获取签约链接     | 是   |
+| 8   | `/getPolicyInfoByPhoneNo`        | 按手机号查保单    | 是   |
+| 9   | `/getProductPricesByPolicyId`    | 按保单 ID 查价格 | 是   |
+| 10  | `/getPolicyInfoByPolicyId`       | 按保单 ID 查详情 | 否   |
+
 
 ### 4.1 推荐调用顺序
 
@@ -147,10 +161,12 @@ flowchart LR
   E --> J[getPolicyInfoByPolicyId]
 ```
 
+
+
 - `productCode` 来自 `getProductInfoByChannel`。
-- `policyId` 来自 `proInsurance` 成功响应。
+- `policyId` 由下游在请求体中携带（通常来自其侧 `proInsurance` 结果）；本服务透明转发，不生成、不校验具体值。集成测试从 `proInsurance` 响应取 `policyId` 串联后续用例。
 - `userId` 来自 `verifyNoCode` 成功响应（`getSignUrl` 需要）。
-- `bankCode`、`cardType` 来自 `getBankList`（`getSignUrl` 需要）。
+- `bankCode`、`payChannelId`、`cardType` 来自 **同一条** `getBankList` 记录（`getSignUrl` 需要；`payChannelId` 与 `bankCode` 配套，禁止跨行组合）。
 
 ---
 
@@ -160,13 +176,15 @@ flowchart LR
 
 由本服务在校验或转发前返回，`data` 一般为 `null`：
 
-| code | message（示例） | 说明 |
-|------|-----------------|------|
-| 400 | `invalid json` / `channelCode required` / `pii decrypt failed` | 请求体非法、缺字段或三要素解密失败 |
-| 401 | `invalid channel key` / `sign verify failed` | 密钥或签名错误 |
-| 403 | `invalid channel` | 渠道不存在或已禁用 |
-| 502 | `upstream unavailable` | 平台后端业务系统不可达 |
-| 504 | `upstream timeout` | 平台处理超时 |
+
+| code | message（示例）                                                    | 说明                |
+| ---- | -------------------------------------------------------------- | ----------------- |
+| 400  | `invalid json` / `channelCode required` / `pii decrypt failed` | 请求体非法、缺字段或三要素解密失败 |
+| 401  | `invalid channel key` / `sign verify failed`                   | 密钥或签名错误           |
+| 403  | `invalid channel`                                              | 渠道不存在或已禁用         |
+| 502  | `upstream unavailable`                                         | 平台后端业务系统不可达       |
+| 504  | `upstream timeout`                                             | 平台处理超时            |
+
 
 ### 5.2 业务层
 
@@ -189,9 +207,11 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | `timestamp`、`channelCode`、`key`、`sign` |
+
+| 字段   | 必填  | 说明                                     |
+| ---- | --- | -------------------------------------- |
+| 公共字段 | 是   | `timestamp`、`channelCode`、`key`、`sign` |
+
 
 #### 请求示例
 
@@ -233,14 +253,16 @@ flowchart LR
 
 #### 响应字段（data[]）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `bankCode` | string | 银行编码 |
-| `bankName` | string | 银行名称 |
-| `debitCard` | string | `"1"` 支持储蓄卡，`"0"` 不支持 |
-| `creditCard` | string | `"1"` 支持信用卡，`"0"` 不支持 |
-| `sortOrder` | integer | 排序 |
-| `payChannelId` | string | 支付渠道 ID |
+
+| 字段             | 类型      | 说明                    |
+| -------------- | ------- | --------------------- |
+| `bankCode`     | string  | 银行编码                  |
+| `bankName`     | string  | 银行名称                  |
+| `debitCard`    | string  | `"1"` 支持储蓄卡，`"0"` 不支持 |
+| `creditCard`   | string  | `"1"` 支持信用卡，`"0"` 不支持 |
+| `sortOrder`    | integer | 排序                    |
+| `payChannelId` | string  | 支付渠道 ID               |
+
 
 ---
 
@@ -250,9 +272,11 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
+
+| 字段   | 必填  | 说明    |
+| ---- | --- | ----- |
+| 公共字段 | 是   | 见 2.2 |
+
 
 #### 请求示例
 
@@ -286,10 +310,12 @@ flowchart LR
 
 #### 响应字段（data[]）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
+
+| 字段            | 类型     | 说明               |
+| ------------- | ------ | ---------------- |
 | `productCode` | string | 产品编码，供投保、报价等接口使用 |
-| `productName` | string | 产品名称 |
+| `productName` | string | 产品名称             |
+
 
 ---
 
@@ -297,34 +323,40 @@ flowchart LR
 
 **路径**：`POST /upChannelApi/getProductPricesByProductCode`
 
+`productCode` 须来自 `getProductInfoByChannel` 返回的 `data[].productCode`（与华安配套，勿手写）。华安直连实测见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md#getproductpricesbyproductcode--查询产品价格)。
+
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `productCode` | 是 | 产品编码 |
-| `hasSocialSecurity` | 是 | 是否有社保，如 `"1"` |
-| `phoneNo` | 是 | 三要素密文 |
-| `name` | 是 | 三要素密文 |
-| `idCard` | 是 | 三要素密文 |
 
-#### 请求示例
+| 字段                  | 必填  | 说明            |
+| ------------------- | --- | ------------- |
+| 公共字段                | 是   | 见 2.2         |
+| `productCode`       | 是   | 产品编码，来自 getProductInfoByChannel |
+| `hasSocialSecurity` | 是   | 是否有社保，如 `"1"` |
+| `phoneNo`           | 是   | 三要素密文         |
+| `name`              | 是   | 三要素密文         |
+| `idCard`            | 是   | 三要素密文         |
+
+
+#### 请求示例（渠道侧，三要素为密文）
 
 ```json
 {
-  "timestamp": "1780402913050",
+  "timestamp": "1780456222050",
   "channelCode": "YOUR_CHANNEL_CODE",
   "key": "YOUR_CHANNEL_KEY",
-  "sign": "e38631865f23f3f5de4fe927c93357c8",
-  "productCode": "ZFHLW1040003",
+  "sign": "YOUR_SIGN",
+  "productCode": "ZFHLW1041001",
   "hasSocialSecurity": "1",
-  "phoneNo": "i/sKyPuD947n5F84YrCxv/XVbZBUkIl0sH3UOjs71ZncA6yWCEn2",
-  "name": "6ipV2pYynPziAEW9PlC9PoJFzGJhvi93sMrmFc9tntBE7w==",
-  "idCard": "/ZnjcUzLtg8wJPmgGrcS0o29QN2L/Fo6MtM9PcPmAD/3pcDqwuWUDoBA9poTOA=="
+  "phoneNo": "Base64密文(手机号)",
+  "name": "Base64密文(姓名)",
+  "idCard": "Base64密文(身份证号)"
 }
 ```
 
-#### 响应示例
+#### 响应示例（华安原文；经本服务返回时 `data` 结构一致）
+
+**productCode = `ZFHLW1041001`（百万医疗险-体验版）**
 
 ```json
 {
@@ -332,16 +364,41 @@ flowchart LR
   "message": "操作成功",
   "data": [
     {
-      "price": 0.7,
+      "productCode": "ZFHLW1041001",
+      "productId": "cc55f8cff47a4f0d88da3a9ca057772a",
+      "price": 0.65,
+      "productName": "百万医疗险-体验版",
+      "productType": "1"
+    },
+    {
+      "productCode": "ZFBWYL1038002",
+      "productId": "fade25f092f44d2088fe8d7eeba4d493",
+      "price": 150.8,
+      "productName": "百万医疗险-正式版",
+      "productType": "2"
+    }
+  ]
+}
+```
+
+**productCode = `ZFHLW1040003`（抗癌险-体验版）**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
       "productCode": "ZFHLW1040003",
       "productId": "3ecd3842febd42e2854403d9cfe67c36",
+      "price": 0.70,
       "productName": "抗癌险-体验版",
       "productType": "1"
     },
     {
-      "price": 42.22,
       "productCode": "ZFHLW1040002",
       "productId": "c19338f72a354ab69307381b9647ec47",
+      "price": 42.22,
       "productName": "抗癌险-正式版",
       "productType": "2"
     }
@@ -351,13 +408,15 @@ flowchart LR
 
 #### 响应字段（data[]）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `productCode` | string | 产品编码 |
-| `productName` | string | 产品名称 |
-| `productId` | string | 产品 ID |
-| `productType` | string | 产品类型 |
-| `price` | number | 价格 |
+
+| 字段            | 类型     | 说明    |
+| ------------- | ------ | ----- |
+| `productCode` | string | 产品编码  |
+| `productName` | string | 产品名称  |
+| `productId`   | string | 产品 ID |
+| `productType` | string | `"1"` 体验版，`"2"` 正式版 |
+| `price`       | number | 价格（元） |
+
 
 ---
 
@@ -367,12 +426,14 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `phoneNo` | 是 | 三要素密文 |
-| `name` | 是 | 三要素密文 |
-| `idCard` | 是 | 三要素密文 |
+
+| 字段        | 必填  | 说明    |
+| --------- | --- | ----- |
+| 公共字段      | 是   | 见 2.2 |
+| `phoneNo` | 是   | 三要素密文 |
+| `name`    | 是   | 三要素密文 |
+| `idCard`  | 是   | 三要素密文 |
+
 
 #### 请求示例
 
@@ -406,11 +467,13 @@ flowchart LR
 
 #### 响应字段（data）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `userId` | string | 用户 ID（明文），供 `getSignUrl` 等使用 |
-| `channelCode` | string | 渠道编码 |
-| `phoneNo` / `name` / `idCard` | string | 三要素密文 |
+
+| 字段                            | 类型     | 说明                           |
+| ----------------------------- | ------ | ---------------------------- |
+| `userId`                      | string | 用户 ID（明文），供 `getSignUrl` 等使用 |
+| `channelCode`                 | string | 渠道编码                         |
+| `phoneNo` / `name` / `idCard` | string | 三要素密文                        |
+
 
 ---
 
@@ -418,39 +481,59 @@ flowchart LR
 
 **路径**：`POST /upChannelApi/proInsurance`
 
+`productCode` 须来自 `getProductInfoByChannel`。华安直连实测见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md#proinsurance--投保)。成功时 `policyId` 每次新生成。
+
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `productCode` | 是 | 产品编码 |
-| `hasSocialSecurity` | 是 | 是否有社保，如 `"1"`；未传可能导致业务失败 |
-| `phoneNo` / `name` / `idCard` | 是 | 三要素密文 |
 
-#### 请求示例
+| 字段                            | 必填  | 说明                       |
+| ----------------------------- | --- | ------------------------ |
+| 公共字段                          | 是   | 见 2.2                    |
+| `productCode`                 | 是   | 产品编码，来自 getProductInfoByChannel |
+| `hasSocialSecurity`           | 是   | 是否有社保，如 `"1"`；未传可能导致业务失败 |
+| `phoneNo` / `name` / `idCard` | 是   | 三要素密文                    |
+
+
+#### 请求示例（渠道侧，三要素为密文）
 
 ```json
 {
-  "timestamp": "1780402913441",
+  "timestamp": "1780456222458",
   "channelCode": "YOUR_CHANNEL_CODE",
   "key": "YOUR_CHANNEL_KEY",
-  "sign": "d9a63c23ee1a5e179147ff4ba4668650",
-  "productCode": "ZFHLW1040003",
+  "sign": "YOUR_SIGN",
+  "productCode": "ZFHLW1041001",
   "hasSocialSecurity": "1",
-  "phoneNo": "IN77zvQa4xNIa2wd4SmQGUnTRi+GCvn1MvfWkfnV6NQO5xQO+UVQ",
-  "name": "1vaoJ0w74ADr+e1gnQjIyJzAM6rhk2l2XZB2SXV9KaYMLQ==",
-  "idCard": "NJwoUUjz6b8a34DXu/lLEZo4n+vMheHWPWWLZrGdMe7PZg7Olbor/zLSPIZPnA=="
+  "phoneNo": "Base64密文(手机号)",
+  "name": "Base64密文(姓名)",
+  "idCard": "Base64密文(身份证号)"
 }
 ```
 
-#### 响应示例（成功）
+#### 响应示例（成功，华安原文）
+
+**productCode = `ZFHLW1041001`**
 
 ```json
 {
   "code": 200,
   "message": "操作成功",
   "data": {
-    "policyId": "0f13299c23094ae397fd9ef5ff9049a5",
+    "policyId": "9697d878b6474c619fa43ffa9ca3b4b0",
+    "policyStatus": "0",
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab"
+  }
+}
+```
+
+**productCode = `ZFHLW1040003`**
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "policyId": "ab185a401820431aad4be32c329ab003",
     "policyStatus": "0",
     "userId": "5c819c252ab343e2a2a6df98b3a014ab"
   }
@@ -459,11 +542,13 @@ flowchart LR
 
 #### 响应字段（data）
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `policyId` | string | 保单 ID |
-| `policyStatus` | string | 保单状态 |
-| `userId` | string | 用户 ID |
+
+| 字段             | 类型     | 说明    |
+| -------------- | ------ | ----- |
+| `policyId`     | string | 保单 ID（每次投保新生成） |
+| `policyStatus` | string | 保单状态（实测 `"0"`） |
+| `userId`       | string | 用户 ID |
+
 
 ---
 
@@ -473,10 +558,12 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `policyId` | 是 | 保单 ID（通常来自 `proInsurance`） |
+
+| 字段         | 必填  | 说明                         |
+| ---------- | --- | -------------------------- |
+| 公共字段       | 是   | 见 2.2                      |
+| `policyId` | 是   | 保单 ID（通常来自 `proInsurance`） |
+
 
 #### 请求示例
 
@@ -508,14 +595,17 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `policyId` | 是 | 保单 ID |
-| `bankCode` | 是 | 银行编码，如 `BOC` |
-| `cardType` | 是 | 卡类型，`"1"` 储蓄卡 |
-| `userId` | 是 | 用户 ID（**明文**，来自 `verifyNoCode`） |
-| `phoneNo` / `name` / `idCard` | 是 | 三要素密文 |
+
+| 字段                            | 必填  | 说明                              |
+| ----------------------------- | --- | ------------------------------- |
+| 公共字段                          | 是   | 见 2.2                           |
+| `policyId`                    | 是   | 保单 ID                           |
+| `bankCode`                    | 是   | 银行编码，须与下方 `payChannelId` 来自同一条 `getBankList` 记录 |
+| `payChannelId`                | 是   | 支付渠道 ID，与 `bankCode` 配套，取自 `getBankList` 同条 `data[]` |
+| `cardType`                    | 是   | 卡类型，`"1"` 储蓄卡，`"2"` 信用卡（与所选银行 `debitCard`/`creditCard` 能力一致） |
+| `userId`                      | 是   | 用户 ID（**明文**，来自 `verifyNoCode`） |
+| `phoneNo` / `name` / `idCard` | 是   | 三要素密文                           |
+
 
 #### 请求示例
 
@@ -527,6 +617,7 @@ flowchart LR
   "sign": "9468fc415cbaee2f09defc9e5c953b8e",
   "policyId": "91a51cc70e724d4885ac2e27530099ec",
   "bankCode": "BOC",
+  "payChannelId": "4bf5dd6ece6847e68ee6c5d4345afee4",
   "cardType": "1",
   "userId": "5c819c252ab343e2a2a6df98b3a014ab",
   "phoneNo": "lzs41ZKWPBHagnOgJg8JpxAakG7q+ppmIAIoOy0CgkZ39qPaiPcP",
@@ -555,10 +646,12 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `phoneNo` / `name` / `idCard` | 是 | 三要素密文 |
+
+| 字段                            | 必填  | 说明    |
+| ----------------------------- | --- | ----- |
+| 公共字段                          | 是   | 见 2.2 |
+| `phoneNo` / `name` / `idCard` | 是   | 三要素密文 |
+
 
 #### 请求示例
 
@@ -615,12 +708,14 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `policyId` | 是 | 保单 ID |
-| `hasSocialSecurity` | 是 | 如 `"1"` |
-| `phoneNo` / `name` / `idCard` | 是 | 三要素密文 |
+
+| 字段                            | 必填  | 说明      |
+| ----------------------------- | --- | ------- |
+| 公共字段                          | 是   | 见 2.2   |
+| `policyId`                    | 是   | 保单 ID   |
+| `hasSocialSecurity`           | 是   | 如 `"1"` |
+| `phoneNo` / `name` / `idCard` | 是   | 三要素密文   |
+
 
 #### 请求示例
 
@@ -658,10 +753,12 @@ flowchart LR
 
 #### 请求参数
 
-| 字段 | 必填 | 说明 |
-|------|------|------|
-| 公共字段 | 是 | 见 2.2 |
-| `policyId` | 是 | 保单 ID |
+
+| 字段         | 必填  | 说明    |
+| ---------- | --- | ----- |
+| 公共字段       | 是   | 见 2.2 |
+| `policyId` | 是   | 保单 ID |
+
 
 #### 请求示例
 
@@ -717,11 +814,13 @@ flowchart LR
 
 ## 7. 联调与工具
 
-| 资源 | 说明 |
-|------|------|
-| [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) | 完整请求/响应 JSON 归档（内部联调） |
-| `scripts/channel_sim/` | 依次调用 10 个接口的模拟程序 |
-| OpenAPI | 运行服务后访问 `{平台域名}/openapi.yaml`（管理后台接口亦在其中） |
+
+| 资源                                                 | 说明                                        |
+| -------------------------------------------------- | ----------------------------------------- |
+| [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) | 完整请求/响应 JSON 归档（内部联调）                     |
+| `scripts/channel_sim/`                             | 依次调用 10 个接口的模拟程序                          |
+| OpenAPI                                            | 运行服务后访问 `{平台域名}/openapi.yaml`（管理后台接口亦在其中） |
+
 
 环境变量示例（模拟程序）：
 
@@ -738,6 +837,9 @@ go run ./scripts/channel_sim/
 
 ## 8. 修订记录
 
-| 日期 | 说明 |
-|------|------|
+
+| 日期         | 说明                |
+| ---------- | ----------------- |
 | 2026-06-02 | 初版：基于渠道侧实测请求/响应编写 |
+
+
