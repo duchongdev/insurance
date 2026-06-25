@@ -15,14 +15,15 @@
 | 平台域名                | 由运营提供，如 `https://your-bridge.example.com`   |
 | `channelCode`       | 渠道编码，管理后台创建渠道后分配                            |
 | `channelKey`        | 渠道签名密钥，写入请求体 `key` 字段，参与 `sign` 计算          |
-| `dataEncryptionKey` | 32 字节 UTF-8 字符串，与平台约定，用于三要素 AES-256-GCM 加解密 |
+| `dataEncryptionKey` | 32 字节 UTF-8 字符串，与平台约定，用于三要素 AES-256-GCM 加解密（仅 `piiEncrypted=true` 时需要） |
+| `piiEncrypted`      | 由平台按渠道配置，**渠道侧不可传**；决定本渠道是否须对三要素加解密。平台在 Redis 缓存该配置，管理后台变更渠道时同步更新；API 按 `channelCode` 读取 |
 
 
 接入流程：
 
-1. 联系平台管理员在管理后台创建渠道，获取 `channelCode`、`channelKey`。
-2. 索取三要素加密密钥 `dataEncryptionKey`（须为 **32 字节**）。
-3. 按本文档实现签名与加解密后，从「查询类」接口开始联调。
+1. 联系平台管理员在管理后台创建渠道，获取 `channelCode`、`channelKey`（**默认 `piiEncrypted=true`，须加密三要素**）。
+2. 向运营确认该渠道的 `piiEncrypted`：为 `true` 时索取 `dataEncryptionKey`（须为 **32 字节**）；为 `false` 时三要素可明文传输（须平台显式关闭加密）。
+3. 按本文档实现签名与（按需）加解密后，从「查询类」接口开始联调。
 
 ---
 
@@ -71,6 +72,10 @@
 
 ### 2.4 用户三要素（PII）
 
+是否对三要素加解密由平台按渠道配置字段 **`piiEncrypted`** 决定（管理后台维护，运行时缓存在 Redis，渠道 API 按 `channelCode` 查询）。**新建渠道默认为 `true`（须加密）**。渠道商接入前须向运营确认所属渠道的配置。
+
+#### 2.4.1 `piiEncrypted = true`（默认）
+
 以下字段在**请求**中须使用 `dataEncryptionKey` 做 **AES-256-GCM** 加密后 **Base64** 编码再提交：
 
 
@@ -90,7 +95,14 @@
 
 **响应**中，平台对 `data`（及 `data[]` 元素、`insuredList` 项）内的 `phoneNo`、`name`、`idCard`、`insuredCardNo`、`insuredName` 等敏感字段会以相同算法加密后返回。`userId` 等业务 ID 字段一般为**明文**。
 
-参考实现：`internal/pkg/cipher/cipher.go`（Go）。
+#### 2.4.2 `piiEncrypted = false`
+
+- **请求**：`phoneNo`、`name`、`idCard` 及 `insuredList` 内相关字段以**明文**提交。
+- **响应**：上述 PII 字段以**明文**返回（与华安字段一致）。
+- **签名**：仍对 JSON 中**实际提交的明文**参与 `sign` 计算。
+- **适用**：须平台在管理后台显式关闭；通常仅测试联调或可信内网渠道。
+
+参考实现：`internal/pkg/cipher/cipher.go`（Go）。架构说明见 [PII_CHANNEL_ENCRYPTION.md](./PII_CHANNEL_ENCRYPTION.md)、[ARCHITECTURE.md](./ARCHITECTURE.md)。
 
 ---
 

@@ -105,7 +105,7 @@ docker compose logs -f nginx
 
 浏览器访问：
 
-- 管理后台：`http://<服务器IP>:5051/admin/`
+- 管理后台：`http://<服务器IP>:5051/`（根路径自动跳转 `/admin/`）
 - API 文档：`http://<服务器IP>:5051/openapi.yaml`
 
 默认管理员用户名见 `config/config.yaml` 中 `admin.default_username`（默认 `admin`），密码为你在 `.env` 中配置的 `BRIDGE_ADMIN_DEFAULT_PASSWORD`。**首次登录后请修改密码。**

@@ -6,7 +6,7 @@
 
 - **渠道 API**：完整实现 `ZF保险.md` 中 `/upChannelApi` 下 10 个接口
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
-- **三要素加解密**：渠道侧 AES-256-GCM；转发华安为明文（符合华安文档）
+- **三要素加解密**：默认渠道侧 AES-256-GCM；可按渠道关闭（明文对接）。是否加密由 Redis 渠道配置缓存决定，管理后台创建/修改/删除渠道时同步更新缓存；**新建渠道默认须加密**
 - **银行列表**：`getBankList` 支持 Redis → `bank_info_t` → 华安 多级缓存；管理后台可查询与手动刷新
 - **管理后台**：Vue 3 + Element Plus（`web/admin/`），渠道配置、银行列表、管理员登录
 - **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化服务日志（轮转、gzip 归档、90 天自动清理）
@@ -40,7 +40,7 @@ cp config/config.yaml.example config/config.yaml
 ```
 
 - 渠道 API：`http://localhost:5051/upChannelApi/...`
-- 管理后台：`http://localhost:5051/admin/`（Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发，API 代理至 Go）
+- 管理后台：`http://localhost:5051/`（自动进入 `/admin/`，未登录跳转登录页；Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发，API 代理至 Go）
 - 默认管理员：见 `config/config.yaml` 中 `admin` 段（首次启动自动创建）
 - OpenAPI：`http://localhost:5051/openapi.yaml`
 
@@ -73,11 +73,11 @@ cp config/config.yaml.example config/config.yaml
 
 ## 渠道接入说明
 
-1. 在管理后台创建渠道，获得 `channelCode` 与 `channelKey`，并配置华安提供的 `huaAnKey`。
-2. 请求体与 `ZF保险.md` 一致，但 `phoneNo`、`name`、`idCard` 需使用本服务配置的 `data_encryption_key` 做 AES-256-GCM 加密后 Base64 传输。
-3. 签名规则与文档一致：参数按 key ASCII 排序拼接 `k=v&...`，MD5 32 位小写；`key` 字段填渠道密钥。
+1. 在管理后台创建渠道，获得 `channelCode` 与 `channelKey`，并配置华安提供的 `huaAnKey`。**新建渠道默认开启三要素加密**（`piiEncrypted=true`）。
+2. 向运营确认该渠道的 `piiEncrypted` 配置：为 `true` 时，`phoneNo`、`name`、`idCard` 须使用 `data_encryption_key` 做 AES-256-GCM 加密后 Base64 传输；为 `false` 时可传明文（须与平台约定，通常仅联调/内网）。
+3. 签名规则与文档一致：参数按 key ASCII 排序拼接 `k=v&...`，MD5 32 位小写；`key` 字段填渠道密钥。签名参与计算的 PII 值须与请求 JSON 中实际提交一致（密文或明文）。
 
-签名示例见单元测试 `internal/pkg/sign/sign_test.go`（与文档示例一致）。渠道商接口文档见 **[docs/CHANNEL_API.md](./docs/CHANNEL_API.md)**。
+方案细节见 **[docs/PII_CHANNEL_ENCRYPTION.md](./docs/PII_CHANNEL_ENCRYPTION.md)**；渠道商接口文档见 **[docs/CHANNEL_API.md](./docs/CHANNEL_API.md)**。
 
 ## 本地开发
 

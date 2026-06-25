@@ -6,8 +6,8 @@
 
 本服务是华安与下游渠道商之间的**中间层**：
 
-- **下游渠道商**：调用本服务 `/upChannelApi/*`，使用本服务分配的 `channelKey` 验签，三要素 AES 加密传输。
-- **本服务**：验签、PII 转换、密钥替换、转发华安、银行列表缓存。
+- **下游渠道商**：调用本服务 `/upChannelApi/*`，使用本服务分配的 `channelKey` 验签；三要素默认 AES 加密传输（可按渠道配置为明文，见 [PII_CHANNEL_ENCRYPTION.md](./PII_CHANNEL_ENCRYPTION.md)）。
+- **本服务**：验签、按渠道 PII 开关加解密、密钥替换、转发华安、银行列表缓存；渠道配置（含 PII 开关）缓存在 Redis，管理后台变更时同步更新。
 - **华安上游**：接收本服务转发的请求，使用华安分配的 `huaAnKey` 验签，三要素为明文。
 
 当前阶段以**透明转发**为主；`getBankList` 另有 Redis / 数据库多级缓存。
@@ -26,9 +26,9 @@ flowchart TB
         C[HuaAnClient.Call]
     end
 
-    P -->|"验签 + PII 解密"| C
+    P -->|"验签 + 按缓存 PII 开关"| C
     C -->|"华安明文 JSON"| P
-    P -->|"PII 加密"| H
+    P -->|"按开关 PII 加密"| H
     C --> Real[华安 API]
 ```
 
@@ -38,7 +38,7 @@ flowchart TB
 |----|------|
 | HTTP 入口 | `POST /upChannelApi/{path}` |
 | Handler | `internal/handler/channel.go` → `ProxyService.Forward` |
-| 职责 | 校验 `channelCode` / `channelKey` / `sign`；请求 PII 解密、响应 PII 加密；`getBankList` 缓存策略（Redis → DB → 华安） |
+| 职责 | 校验 `channelCode` / `channelKey` / `sign`；从 **Redis 渠道配置缓存** 读取 `piiEncrypted` 决定是否加解密；`getBankList` 缓存策略（Redis → DB → 华安） |
 | 不包含 | 华安 HTTP 细节、URL 拼接、上游超时处理 |
 
 ### 2.2 华安层
@@ -56,11 +56,47 @@ flowchart TB
 `ProxyService`（`internal/service/proxy.go`）负责编排：
 
 ```text
-Forward:  验签 → [getBankList 缓存] → PII 解密 → huaan.Call → [写缓存] → PII 加密 → 返回
+Forward:  验签 → 读渠道缓存(piiEncrypted) → [getBankList 缓存] → [PII 解密] → huaan.Call → [写缓存] → [PII 加密] → 返回
 RefreshBankList:  huaan.Call("/getBankList") → 写 Redis / bank_info_t
+Admin 渠道 CRUD:  写 MySQL → 同步更新/删除 Redis 渠道配置缓存
 ```
 
 `RefreshBankList` 供管理后台手动刷新银行列表，同样走华安层。
+
+### 2.4 渠道配置缓存
+
+渠道代理除验签外，须按 `channelCode` 判断该渠道是否要求三要素加解密。该配置**不每次查库**，而是缓存在 Redis，由管理后台渠道 CRUD 维护一致性。
+
+| 项 | 说明 |
+|----|------|
+| 存储 | Redis（与银行列表缓存共用 Redis 实例，键空间独立） |
+| 键格式 | `bridge:channel:{channelCode}` |
+| 值格式 | JSON，至少含 `piiEncrypted`（bool）；建议同时缓存 `channelKey`、`status` 等代理所需字段，减少重复查库 |
+| 读取方 | `ProxyService.Forward`（及 bank list 缓存命中路径）按 `channelCode` 读取 `piiEncrypted` |
+| 写入方 | `AdminService` 创建/修改/删除渠道后**同步**更新或删除对应缓存键 |
+| 默认值 | **新建渠道** `piiEncrypted = true`（须加密） |
+| 冷启动 | 服务启动时从 `channels` 表**预热**全部启用渠道至 Redis；单键未命中时可回源 MySQL 并回填 |
+| TTL | 建议**不过期**（`0`），依赖管理操作与启动预热保证一致；避免 TTL 过期后短暂行为不一致 |
+
+```mermaid
+flowchart LR
+    subgraph admin ["管理后台"]
+        CRUD[渠道 创建/修改/删除]
+    end
+    subgraph store ["存储"]
+        DB[(MySQL channels)]
+        RC[(Redis bridge:channel:*)]
+    end
+    subgraph api ["渠道 API"]
+        F[ProxyService.Forward]
+    end
+    CRUD -->|写| DB
+    CRUD -->|同步 Set/Del| RC
+    F -->|GetByCode 验签| DB
+    F -->|读 piiEncrypted| RC
+```
+
+**说明**：验签仍可通过 `ChannelRepo.GetByCode` 查 MySQL 获取 `channelKey`（保证密钥权威来源）；`piiEncrypted` **以缓存为准**。若后续将完整渠道配置迁入缓存，可合并为一次 Redis 读取，本方案文档按「PII 开关走缓存」为硬性要求。
 
 ## 3. 接口一一对应
 
@@ -87,21 +123,29 @@ var APIPaths = []string{
 
 ## 4. 密钥与 PII 流转
 
+是否对三要素加解密由 **`channels.pii_encrypted`** 按渠道配置，运行时经 **Redis 渠道缓存** 读取（键 `bridge:channel:{channelCode}`）。默认 `true`（须加密）。详见 [PII_CHANNEL_ENCRYPTION.md](./PII_CHANNEL_ENCRYPTION.md)。
+
 ```mermaid
 sequenceDiagram
     participant CH as 渠道商
     participant BR as 渠道层
+    participant RC as Redis 渠道缓存
     participant HA as 华安层
     participant UP as 华安
 
-    CH->>BR: channelKey 签名 + PII 密文
-    BR->>BR: 验签、解密 PII
+    CH->>BR: channelKey 签名 + PII（密文或明文）
+    BR->>BR: 验签（MySQL channelKey）
+    BR->>RC: GET piiEncrypted by channelCode
+    alt piiEncrypted = true
+        BR->>BR: 解密请求 PII
+    end
     BR->>HA: plain body + HuaAnKey
-    HA->>HA: 重签
     HA->>UP: POST 华安
     UP-->>HA: 明文 PII 响应
     HA-->>BR: 原始 JSON
-    BR->>BR: 加密响应 PII
+    alt piiEncrypted = true
+        BR->>BR: 加密响应 PII
+    end
     BR-->>CH: 渠道格式 JSON
 ```
 
@@ -109,7 +153,7 @@ sequenceDiagram
 |------|---------------|---------------|---------------|---------------|
 | `key` | `channelKey` | `huaan.key`（配置，默认可为空） | — | — |
 | `sign` | 渠道密钥计算 | `sign_enabled=true` 时按 `huaan.key` 重签，否则 `""` | — | — |
-| `phoneNo` 等 | AES 密文 | 明文 | 明文 | AES 密文 |
+| `phoneNo` 等 | 默认 AES 密文；`piiEncrypted=false` 时为明文 | 明文 | 明文 | 默认 AES 密文；`piiEncrypted=false` 时为明文 |
 
 ## 5. getBankList 特殊逻辑
 
@@ -142,6 +186,9 @@ internal/pkg/
   sign/                     # MD5 签名（渠道与华安共用算法）
   cipher/                   # AES-256-GCM
   pii/                      # 三要素加解密（仅渠道层使用）
+  redis/
+    banklist.go             # 银行列表缓存
+    channel.go              # 渠道配置缓存（piiEncrypted 等，待实现）
 ```
 
 ## 7. 依赖注入
@@ -163,6 +210,7 @@ proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransfor
 
 ## 9. 相关文档
 
+- [PII_CHANNEL_ENCRYPTION.md](./PII_CHANNEL_ENCRYPTION.md) — 按渠道三要素加解密开关与 Redis 缓存方案
 - [TESTING.md](./TESTING.md) — 如何分别测试华安层与全流程
 - [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档（对外）
 - [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) — 渠道侧请求/响应样例
