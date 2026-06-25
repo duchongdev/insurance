@@ -4,10 +4,30 @@ info:
   description: |
     渠道商调用本服务，本服务验签、解密三要素后转发华安，并将华安响应原样返回（三要素字段加密）。
     管理后台 API 需 Bearer Token。
-  version: 1.1.0
+  version: 1.14.0
 servers:
   - url: http://localhost:5051
 paths:
+  /huaan/callback/insureNotify:
+    post:
+      tags: [华安回调]
+      summary: 投保结果回调通知
+      description: |
+        华安调用本服务通知投保/续保结果；本服务按 channelCode 查找渠道 callbackUrl，
+        追加 key/sign 后 POST 转发至下游渠道。HTTP 状态码恒为 200，业务结果见 body.code。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsureNotifyRequest'
+      responses:
+        '200':
+          description: 处理结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackAckResponse'
   /health/live:
     get:
       summary: 存活探针
@@ -25,13 +45,53 @@ paths:
   /upChannelApi/proInsurance:
     post:
       tags: [渠道接口]
-      summary: ZF-预投保
+      summary: 预投保
+      description: |
+        姓名、证件号录入后发起预投保；本服务转发华安 POST /proxy/upChannelApi/proInsurance。
+        成功返回 policyId/policyNo 后继续投保流程。
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SignedRequest'
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [productCode, phoneNo, name, idCard, hasSocialSecurity, isUpgrade, autoRenew]
+                  properties:
+                    productCode:
+                      type: string
+                    phoneNo:
+                      type: string
+                      description: 手机号（须加密）
+                    name:
+                      type: string
+                      description: 姓名（须加密）
+                    idCard:
+                      type: string
+                      description: 身份证号（须加密）
+                    hasSocialSecurity:
+                      type: integer
+                      description: 1 有社保，0 无
+                    isUpgrade:
+                      type: integer
+                      description: 1 升级，0 不升级
+                    autoRenew:
+                      type: integer
+                      description: 1 次年自动续保，0 不自动续保
+                    extra:
+                      type: string
+                      description: 扩展字段，可空
+                    productPriceList:
+                      type: array
+                      description: 可选责任项；不传则使用后台默认份数
+                      items:
+                        type: object
+                        properties:
+                          liabilityName: { type: string }
+                          price: { type: number }
+                          kindCode: { type: string }
+                          uwCount: { type: integer }
       responses:
         '200':
           description: 华安标准响应
@@ -77,10 +137,30 @@ paths:
   /upChannelApi/getBankList:
     post:
       tags: [渠道接口]
-      summary: 获取银行列表（优先 Redis 缓存，其次 bank_info_t，最后请求华安）
+      summary: 获取支持的银行列表
+      description: |
+        本服务转发华安 POST /common/channel/api/getBankList。
+        优先 Redis 缓存，其次 bank_info_t，最后请求华安。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedRequest'
       responses:
         '200':
-          description: ok
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BankListItem'
   /upChannelApi/getProductInfoByChannel:
     post:
       tags: [渠道接口]
@@ -88,20 +168,311 @@ paths:
       responses:
         '200':
           description: ok
+  /upChannelApi/product/info:
+    post:
+      tags: [渠道接口]
+      summary: 获取渠道产品信息
+      description: 按手机号查询渠道产品详情；转发华安 /common/channel/api/product/info
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [phoneNo]
+                  properties:
+                    phoneNo:
+                      type: string
+                      description: 手机号（三要素，须加密）
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/sms/send:
+    post:
+      tags: [渠道接口]
+      summary: 获取用户短信验证码
+      description: 向手机号发送验证码；转发华安 /common/channel/api/sms/send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [phoneNo]
+                  properties:
+                    phoneNo:
+                      type: string
+                      description: 手机号（三要素，须加密）
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/sms/valid:
+    post:
+      tags: [渠道接口]
+      summary: 短信验证码校验
+      description: 校验手机号与短信验证码；转发华安 /common/channel/api/sms/valid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [mobile, smsCode]
+                  properties:
+                    mobile:
+                      type: string
+                      description: 手机号（须加密，对应华安 mobile 字段）
+                    smsCode:
+                      type: string
+                      description: 短信验证码（明文）
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/sms/noValid:
+    post:
+      tags: [渠道接口]
+      summary: 免短信验证码注册登录
+      description: 仅凭手机号注册/登录；转发华安 /common/channel/api/sms/noValid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [mobile]
+                  properties:
+                    mobile:
+                      type: string
+                      description: 手机号（须加密，对应华安 mobile 字段）
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/priceByUser:
+    post:
+      tags: [渠道接口]
+      summary: 查询产品价格
+      description: 按用户与产品编码查价；转发华安 /common/channel/api/priceByUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [productCode, idCard, hasSocialSecurity]
+                  properties:
+                    productCode:
+                      type: string
+                      description: 产品编码
+                    idCard:
+                      type: string
+                      description: 身份证号（须加密）
+                    hasSocialSecurity:
+                      type: integer
+                      description: 是否有社保，1 有 0 无
+                    productPriceList:
+                      type: array
+                      description: 可选，责任项与份数；不传则使用后台默认配置
+                      items:
+                        type: object
+                        properties:
+                          liabilityName: { type: string }
+                          price: { type: number }
+                          kindCode: { type: string }
+                          uwCount: { type: integer }
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/policy/phone:
+    post:
+      tags: [渠道接口]
+      summary: 通过手机号查询用户投保情况
+      description: |
+        用户二次进入页面时查询已购基础版产品；转发华安 /common/channel/api/policy/phone。
+        `phoneNo` 与 `userId` 至少传一项。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  properties:
+                    phoneNo:
+                      type: string
+                      description: 手机号（须加密；与 userId 二选一）
+                    userId:
+                      type: string
+                      description: 用户 ID（与 phoneNo 二选一）
+      responses:
+        '200':
+          description: 华安标准响应，data 为基础版产品数组
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /upChannelApi/getUserInfoByPhoneNo:
+    post:
+      tags: [渠道接口]
+      summary: 根据手机号或用户 ID 查询用户信息
+      description: |
+        转发华安 POST /common/channel/api/getUserInfoByPhoneNo。
+        `phoneNo` 与 `userId` 至少传一项；响应 data 含三要素须加密返回渠道。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  properties:
+                    phoneNo:
+                      type: string
+                      description: 手机号（须加密；与 userId 二选一）
+                    userId:
+                      type: string
+                      description: 用户 ID（与 phoneNo 二选一）
+      responses:
+        '200':
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserInfoData'
+  /upChannelApi/getLiabilitiesByProductId:
+    post:
+      tags: [渠道接口]
+      summary: 根据产品查询可选责任列表
+      description: 获取可选责任列表，配合 priceByUser 使用；转发华安 /common/channel/api/getLiabilitiesByProductId
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [productCode, idCard, hasSocialSecurity, productType]
+                  properties:
+                    productCode:
+                      type: string
+                      description: 产品编码
+                    idCard:
+                      type: string
+                      description: 身份证号（须加密）
+                    hasSocialSecurity:
+                      type: integer
+                      description: 是否有社保，1 有 0 无
+                    productType:
+                      type: integer
+                      description: 1 体验版，2 正式版
+      responses:
+        '200':
+          description: 华安标准响应，data 为责任项数组
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
   /upChannelApi/getProductPricesByPolicyId:
     post:
       tags: [渠道接口]
-      summary: 保单ID查价格
+      summary: 按保单 ID 查价格（收银台）
+      description: |
+        收银台展示支付金额；本服务转发华安 POST /common/channel/api/getProductPricesByPolicyId。
+        仅需 policyId，无需三要素。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [policyId]
+                  properties:
+                    policyId:
+                      type: string
+                      description: 保单 ID（通常来自 proInsurance）
       responses:
         '200':
-          description: ok
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PolicyPriceData'
   /upChannelApi/getPolicyInfoByPolicyId:
     post:
       tags: [渠道接口]
-      summary: 保单ID查信息
+      summary: 根据保单 ID 查询保单信息
+      description: |
+        本服务转发华安 POST /common/channel/api/getPolicyInfoByPolicyId。
+        仅需 policyId；响应中 phoneNo/name/idCard 及 insuredList 内三要素须加密返回渠道。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [policyId]
+                  properties:
+                    policyId:
+                      type: string
+                      description: 保单 ID（通常来自 proInsurance）
       responses:
         '200':
-          description: ok
+          description: 华安标准响应
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PolicyInfoData'
   /admin/api/login:
     post:
       tags: [管理后台]
@@ -127,6 +498,12 @@ paths:
       tags: [管理后台]
       security: [{ bearerAuth: [] }]
       summary: 创建渠道
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelInput'
   /admin/api/banks:
     get:
       tags: [管理后台]
@@ -232,6 +609,130 @@ components:
         bankName: { type: string }
         debitCard: { type: integer, description: '1=支持储蓄卡 0=不支持' }
         creditCard: { type: integer, description: '1=支持信用卡 0=不支持' }
+        payChannelId: { type: string, description: 支付渠道 ID（getBankList 同步） }
+        isActBank: { type: integer, description: '1=活跃银行 0=非活跃' }
         status: { type: integer, description: '1=启用 2=停用' }
         createTime: { type: string, format: date-time }
         updateTime: { type: string, format: date-time }
+    BankListItem:
+      type: object
+      properties:
+        bankName: { type: string, example: 中国工商银行 }
+        bankCode: { type: string, example: ICBC }
+        debitCard: { type: string, description: '"1" 支持储蓄卡，"0" 不支持', example: '1' }
+        creditCard: { type: string, description: '"1" 支持信用卡，"0" 不支持', example: '1' }
+        payChannelId: { type: string }
+        isActBank: { type: integer, description: '1=活跃银行 0=非活跃', example: 1 }
+    PolicyPriceHistoryBind:
+      type: object
+      properties:
+        bankName: { type: string }
+        bankCode: { type: string }
+        isPaySuccess:
+          type: integer
+          description: '1=支付成功 0=支付失败；缺省表示回调未到'
+    PolicyPriceData:
+      type: object
+      properties:
+        productCode: { type: string }
+        productName: { type: string }
+        price: { type: number, format: double }
+        historyBinds:
+          type: array
+          description: 历史绑卡/支付记录（逐步启用）
+          items:
+            $ref: '#/components/schemas/PolicyPriceHistoryBind'
+    PolicyInsuredItem:
+      type: object
+      properties:
+        insuredCardNo: { type: string, description: 被保人证件号（响应须加密） }
+        insuredName: { type: string, description: 被保人姓名（响应须加密） }
+        phoneNo: { type: string, description: 被保人手机号（响应须加密） }
+        hasSocialSecurity: { type: string }
+    PolicyRiskItem:
+      type: object
+      properties:
+        riskName: { type: string }
+        riskCode: { type: string, nullable: true }
+    PolicyInfoData:
+      type: object
+      properties:
+        policyId: { type: string }
+        policyStatus: { type: string }
+        productCode: { type: string }
+        productName: { type: string }
+        productId: { type: string }
+        payPremium: { type: number, format: double }
+        hasSocialSecurity: { type: string }
+        policyStartDate: { type: string, nullable: true }
+        policyEndDate: { type: string, nullable: true }
+        createTime: { type: string }
+        phoneNo: { type: string, description: 投保人手机号（响应须加密） }
+        name: { type: string, description: 投保人姓名（响应须加密） }
+        idCard: { type: string, description: 投保人证件号（响应须加密） }
+        autoRenew: { type: integer, nullable: true }
+        insuredList:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyInsuredItem'
+        riskList:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRiskItem'
+        optionalRiskList:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyRiskItem'
+    UserInfoData:
+      type: object
+      properties:
+        userId: { type: string }
+        idCard: { type: string, description: 证件号（响应须加密） }
+        name: { type: string, description: 姓名（响应须加密） }
+        phoneNo: { type: string, description: 手机号（响应须加密） }
+        channelCode: { type: string }
+    ChannelInput:
+      type: object
+      required: [channelCode, huaAnKey, callbackUrl]
+      properties:
+        channelCode: { type: string }
+        channelName: { type: string }
+        channelKey: { type: string, description: 留空则服务端自动生成 }
+        huaAnKey: { type: string }
+        callbackUrl:
+          type: string
+          description: 投保结果回调地址（本服务转发华安 notify 时使用），须 http(s) URL
+        status: { type: integer, description: '1=启用 0=禁用', default: 1 }
+        remark: { type: string }
+    InsureNotifyRequest:
+      type: object
+      required:
+        - productName
+        - productType
+        - insureTime
+        - policyNo
+        - policyId
+        - amount
+        - policyStartDate
+        - policyEndDate
+        - payStage
+        - channelCode
+        - timestamp
+      properties:
+        productName: { type: string }
+        productType: { type: integer, description: '1 基础版 2 升级版' }
+        insureTime: { type: string, description: 'yyyy-MM-dd HH:mm:ss' }
+        policyNo: { type: string }
+        policyId: { type: string }
+        amount: { type: number, format: double }
+        policyStartDate: { type: string }
+        policyEndDate: { type: string }
+        payStage: { type: integer }
+        channelCode: { type: string }
+        timestamp: { type: integer, format: int64 }
+        extra: { type: string, description: 预投保 extra 原样回传 }
+    CallbackAckResponse:
+      type: object
+      properties:
+        code: { type: integer, example: 200 }
+        message: { type: string, example: 成功 }

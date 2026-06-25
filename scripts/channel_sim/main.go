@@ -18,10 +18,13 @@ import (
 )
 
 type caseDef struct {
-	name    string
-	path    string
-	fields  map[string]interface{}
-	needPII bool
+	name            string
+	path            string
+	fields          map[string]interface{}
+	needPII         bool
+	needMobile      bool
+	needIdCard      bool
+	needPhoneOrUser bool
 }
 
 func main() {
@@ -36,6 +39,7 @@ func main() {
 	productCode := env("TEST_PRODUCT_CODE", "ZFHLW1040003")
 	policyID := env("TEST_POLICY_ID", "91a51cc70e724d4885ac2e27530099ec")
 	userID := env("TEST_USER_ID", "5c819c252ab343e2a2a6df98b3a014ab")
+	smsCode := env("TEST_SMS_CODE", "1234")
 
 	aes, err := cipher.New(encKey)
 	if err != nil {
@@ -56,22 +60,34 @@ func main() {
 	cases := []caseDef{
 		{name: "getBankList", path: huaan.BankListPath},
 		{name: "getProductInfoByChannel", path: "/getProductInfoByChannel"},
+		{name: "productInfo", path: huaan.ProductInfoPath, needPII: true},
+		{name: "smsSend", path: huaan.SmsSendPath, needPII: true},
+		{name: "smsValid", path: huaan.SmsValidPath, needMobile: true, fields: map[string]interface{}{"smsCode": smsCode}},
+		{name: "smsNoValid", path: huaan.SmsNoValidPath, needMobile: true},
+		{name: "priceByUser", path: huaan.PriceByUserPath, needIdCard: true, fields: map[string]interface{}{
+			"productCode": productCode, "hasSocialSecurity": 1,
+		}},
+		{name: "policyByPhone", path: huaan.PolicyByPhonePath, needPhoneOrUser: true},
+		{name: "getUserInfoByPhoneNo", path: huaan.UserInfoByPhoneNoPath, needPhoneOrUser: true},
+		{name: "liabilitiesByProductId", path: huaan.LiabilitiesByProductIDPath, needIdCard: true, fields: map[string]interface{}{
+			"productCode": productCode, "hasSocialSecurity": 1, "productType": 1,
+		}},
 		{name: "getProductPricesByProductCode", path: "/getProductPricesByProductCode", needPII: true, fields: map[string]interface{}{
 			"productCode": productCode, "hasSocialSecurity": "1",
 		}},
 		{name: "verifyNoCode", path: "/verifyNoCode", needPII: true},
-		{name: "proInsurance", path: "/proInsurance", needPII: true, fields: map[string]interface{}{
-			"productCode": productCode, "hasSocialSecurity": "1",
+		{name: "proInsurance", path: huaan.ProInsurancePath, needPII: true, fields: map[string]interface{}{
+			"productCode": productCode, "hasSocialSecurity": 1, "isUpgrade": 0, "autoRenew": 1,
 		}},
 		{name: "upGradeIns", path: "/upGradeIns", fields: map[string]interface{}{"policyId": policyID}},
 		{name: "getSignUrl", path: "/getSignUrl", needPII: true, fields: map[string]interface{}{
 			"policyId": policyID, "bankCode": "BOC", "cardType": "1", "userId": userID,
 		}},
 		{name: "getPolicyInfoByPhoneNo", path: "/getPolicyInfoByPhoneNo", needPII: true},
-		{name: "getProductPricesByPolicyId", path: "/getProductPricesByPolicyId", needPII: true, fields: map[string]interface{}{
-			"policyId": policyID, "hasSocialSecurity": "1",
+		{name: "getProductPricesByPolicyId", path: huaan.ProductPricesByPolicyIDPath, fields: map[string]interface{}{
+			"policyId": policyID,
 		}},
-		{name: "getPolicyInfoByPolicyId", path: "/getPolicyInfoByPolicyId", fields: map[string]interface{}{"policyId": policyID}},
+		{name: "getPolicyInfoByPolicyId", path: huaan.PolicyInfoByPolicyIDPath, fields: map[string]interface{}{"policyId": policyID}},
 	}
 
 	client := &http.Client{Timeout: 35 * time.Second}
@@ -81,12 +97,36 @@ func main() {
 		fields := copyMap(tc.fields)
 		if tc.needPII {
 			if phone == "" || name == "" || idCard == "" {
-				fmt.Printf("\n[%d/10] %s — 跳过：未设置 TEST_PHONE/TEST_NAME/TEST_ID_CARD\n", i+1, tc.name)
+				fmt.Printf("\n[%d/%d] %s — 跳过：未设置 TEST_PHONE/TEST_NAME/TEST_ID_CARD\n", i+1, len(cases), tc.name)
 				continue
 			}
 			fields["phoneNo"] = enc(phone)
 			fields["name"] = enc(name)
 			fields["idCard"] = enc(idCard)
+		}
+		if tc.needMobile {
+			if phone == "" {
+				fmt.Printf("\n[%d/%d] %s — 跳过：未设置 TEST_PHONE\n", i+1, len(cases), tc.name)
+				continue
+			}
+			fields["mobile"] = enc(phone)
+		}
+		if tc.needIdCard {
+			if idCard == "" {
+				fmt.Printf("\n[%d/%d] %s — 跳过：未设置 TEST_ID_CARD\n", i+1, len(cases), tc.name)
+				continue
+			}
+			fields["idCard"] = enc(idCard)
+		}
+		if tc.needPhoneOrUser {
+			if phone != "" {
+				fields["phoneNo"] = enc(phone)
+			} else if userID != "" {
+				fields["userId"] = userID
+			} else {
+				fmt.Printf("\n[%d/%d] %s — 跳过：未设置 TEST_PHONE 或 TEST_USER_ID\n", i+1, len(cases), tc.name)
+				continue
+			}
 		}
 
 		body := huaan.BuildRequestBody(channelCode, fields)
@@ -94,7 +134,7 @@ func main() {
 		body["sign"] = sign.Build(sign.MapFromJSON(body), channelKey)
 
 		reqJSON, _ := json.MarshalIndent(body, "", "  ")
-		fmt.Printf("\n%s\n[%d/10] %s\n%s\n", sep, i+1, tc.name, sep)
+		fmt.Printf("\n%s\n[%d/%d] %s\n%s\n", sep, i+1, len(cases), tc.name, sep)
 		fmt.Printf(">>> POST %s/upChannelApi%s\n\n请求参数:\n%s\n\n", baseURL, tc.path, reqJSON)
 
 		raw, _ := json.Marshal(body)

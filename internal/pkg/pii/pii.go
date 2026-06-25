@@ -2,7 +2,7 @@
 package pii
 
 // RequestFields 渠道请求体顶层需解密的字段（转发华安前转为明文）。
-var RequestFields = []string{"phoneNo", "name", "idCard"}
+var RequestFields = []string{"phoneNo", "mobile", "name", "idCard"}
 
 // ResponseEncryptPaths 文档约定的响应内 PII 路径（点分表示，[] 表示数组下标），供参考；
 // 实际加密由 transform.encryptObjectPII 按字段名递归处理 data / insuredList。

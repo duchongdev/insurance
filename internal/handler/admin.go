@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -89,6 +90,10 @@ func (h *AdminHandler) createChannel(c *gin.Context) {
 		return
 	}
 	if err := h.admin.CreateChannel(&ch); err != nil {
+		if errors.Is(err, service.ErrInvalidChannelConfig) {
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}
@@ -105,6 +110,10 @@ func (h *AdminHandler) updateChannel(c *gin.Context) {
 	}
 	ch.ID = id
 	if err := h.admin.UpdateChannel(&ch); err != nil {
+		if errors.Is(err, service.ErrInvalidChannelConfig) {
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
 	}

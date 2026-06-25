@@ -178,10 +178,18 @@ flowchart TD
 |------|------------|------------|
 | verifyNoCode | 是 | 是 |
 | getPolicyInfoByPhoneNo | 是（phoneNo） | 是 |
+| product/info | 是（phoneNo） | 否 |
+| sms/send | 是（phoneNo） | 否 |
+| sms/valid | 是（mobile） | 是（phoneNo、name、idCard） |
+| sms/noValid | 是（mobile） | 是（phoneNo、name、idCard） |
+| priceByUser | 是（idCard） | 否 |
+| policy/phone | 是（phoneNo，与 userId 二选一） | 是（data[]、insuredList 等） |
+| getUserInfoByPhoneNo | 是（phoneNo，与 userId 二选一） | 是（phoneNo、name、idCard） |
+| getLiabilitiesByProductId | 是（idCard） | 否 |
 | getProductPricesByProductCode | 是 | 否 |
 | proInsurance | 是 | 否 |
 | getSignUrl | 是 | 否 |
-| getProductPricesByPolicyId | 是 | 否 |
+| getProductPricesByPolicyId | 否 | 否 |
 | getPolicyInfoByPolicyId | 否 | 是（insuredList 等） |
 
 不涉及三要素的接口（如 `getBankList`、`getProductInfoByChannel`）不受开关实质影响。

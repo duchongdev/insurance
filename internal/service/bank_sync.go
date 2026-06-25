@@ -26,19 +26,31 @@ func ReplaceBanksFromResponse(banks *repository.BankRepo, respBytes []byte) erro
 func BuildBankListResponseBytes(banks []model.BankInfo) ([]byte, error) {
 	items := make([]map[string]interface{}, 0, len(banks))
 	for _, b := range banks {
+		isAct := int(b.IsActBank)
+		if isAct == 0 && b.Status == 1 {
+			isAct = 1
+		}
 		items = append(items, map[string]interface{}{
-			"bankCode":   b.BankCode,
-			"bankName":   b.BankName,
-			"debitCard":  b.DebitCard,
-			"creditCard": b.CreditCard,
-			"status":     b.Status,
+			"bankName":     b.BankName,
+			"bankCode":     b.BankCode,
+			"debitCard":    cardFlagStr(b.DebitCard),
+			"creditCard":   cardFlagStr(b.CreditCard),
+			"payChannelId": b.PayChannelID,
+			"isActBank":    isAct,
 		})
 	}
 	return json.Marshal(map[string]interface{}{
 		"code":    200,
-		"message": "success",
+		"message": "成功",
 		"data":    items,
 	})
+}
+
+func cardFlagStr(v int8) string {
+	if v == 1 {
+		return "1"
+	}
+	return "0"
 }
 
 func banksFromData(data interface{}) []model.BankInfo {
@@ -83,14 +95,26 @@ func mapsFromSlice(items []interface{}) []map[string]interface{} {
 
 func bankFromMap(m map[string]interface{}) *model.BankInfo {
 	b := &model.BankInfo{
-		BankCode:   firstStr(m, "bankCode", "bank_code"),
-		BankName:   firstStr(m, "bankName", "bank_name"),
-		DebitCard:  firstInt8(m, "debitCard", "debit_card"),
-		CreditCard: firstInt8(m, "creditCard", "credit_card"),
-		Status:     firstInt8(m, "status"),
+		BankCode:     firstStr(m, "bankCode", "bank_code"),
+		BankName:     firstStr(m, "bankName", "bank_name"),
+		DebitCard:    firstInt8(m, "debitCard", "debit_card"),
+		CreditCard:   firstInt8(m, "creditCard", "credit_card"),
+		PayChannelID: firstStr(m, "payChannelId", "pay_channel_id"),
+		IsActBank:    firstInt8(m, "isActBank", "is_act_bank"),
+		Status:       firstInt8(m, "status"),
 	}
-	if b.Status == 0 {
+	if _, ok := m["isActBank"]; ok {
+		if b.IsActBank == 1 {
+			b.Status = 1
+		} else {
+			b.Status = 2
+		}
+	} else if b.Status == 0 {
 		b.Status = 1
+		b.IsActBank = 1
+	}
+	if b.IsActBank == 0 && b.Status == 1 {
+		b.IsActBank = 1
 	}
 	return b
 }

@@ -33,7 +33,7 @@ go test ./... -count=1
 
 ## 3. 华安直连集成测试
 
-验证本服务**真实华安对接代码**（`huaan.Client`）能否正确调用华安 10 个接口。请求体始终包含 `key` 与 `sign`：默认 `HUAAN_KEY` 为空、`sign_enabled=false` 时 `sign` 也为空字符串。
+验证本服务**真实华安对接代码**（`huaan.Client`）能否正确调用华安 17 个接口。请求体始终包含 `key` 与 `sign`：默认 `HUAAN_KEY` 为空、`sign_enabled=false` 时 `sign` 也为空字符串。
 
 ### 3.1 准备环境变量
 
@@ -55,6 +55,7 @@ set -a && source .env.huaan && set +a
 | `HUAAN_TEST_PHONE` | 含 PII 接口 | 明文手机号 |
 | `HUAAN_TEST_NAME` | 含 PII 接口 | 明文姓名 |
 | `HUAAN_TEST_ID_CARD` | 含 PII 接口 | 明文身份证号 |
+| `HUAAN_TEST_SMS_CODE` | `sms/valid` | 短信验证码明文 |
 | `HUAAN_TEST_USER_ID` | 否 | 仅当 `proInsurance` 未返回 `userId` 时，`getSignUrl` 测试备用 |
 
 `productCode`、`policyId` **无需配置**：集成测试分别从 `getProductInfoByChannel`、`proInsurance` 响应解析（与生产一致——`policyId` 由下游请求携带，本服务只转发）。
@@ -83,24 +84,32 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 - 未配置必填环境变量时，测试 `t.Skip` 跳过。
 - `getProductPricesByProductCode`、`proInsurance` 的 `productCode` **自动**从 `getProductInfoByChannel` 获取（`TestHuaAnDirect_ProductFromChannel`）。
 - 依赖 `policyId` 的接口（`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`upGradeIns`、`getSignUrl`）在测试中 **先调 proInsurance** 取 `policyId`（`TestHuaAnDirect_PolicyFromProInsurance`、`TestHuaAnDirect_GetSignUrl`）。
-- `proInsurance`、`getProductPricesByProductCode`、`getProductPricesByPolicyId` 集成测试默认带 `hasSocialSecurity: "1"`（华安必填）；后两者还需三要素环境变量。
+- `proInsurance` 集成测试默认带 `hasSocialSecurity: 1`（整数）、`isUpgrade: 0`、`autoRenew: 1`；`getProductPricesByProductCode` 仍用 `hasSocialSecurity: "1"`（字符串）并需三要素；`getProductPricesByPolicyId` **仅需 `policyId`**。
 
 ### 3.4 覆盖的接口
 
-与 `huaan.APIPaths` 一致，共 10 个：
+与 `huaan.APIPaths` 一致，共 17 个：
 
 | 路径 | 说明 |
 |------|------|
-| `/proInsurance` | 投保 |
+| `/proInsurance` | 预投保（上游 `/proxy/upChannelApi/proInsurance`） |
 | `/upGradeIns` | 升级险种 |
 | `/getSignUrl` | 获取签约链接（须 `payChannelId`，见 **3.6** 专项测试） |
 | `/verifyNoCode` | 无验证码实名 |
 | `/getPolicyInfoByPhoneNo` | 按手机号查保单 |
 | `/getProductPricesByProductCode` | 按产品编码报价 |
-| `/getBankList` | 银行列表 |
+| `/getBankList` | 银行列表（上游 `/common/channel/api/getBankList`） |
 | `/getProductInfoByChannel` | 渠道产品列表 |
-| `/getProductPricesByPolicyId` | 按保单报价 |
-| `/getPolicyInfoByPolicyId` | 按保单 ID 查询 |
+| `/product/info` | 获取渠道产品信息（上游 `/common/channel/api/product/info`） |
+| `/sms/send` | 发送短信验证码（上游 `/common/channel/api/sms/send`） |
+| `/sms/valid` | 短信验证码校验（上游 `/common/channel/api/sms/valid`） |
+| `/sms/noValid` | 免短信验证码注册登录（上游 `/common/channel/api/sms/noValid`） |
+| `/priceByUser` | 查询产品价格（上游 `/common/channel/api/priceByUser`） |
+| `/policy/phone` | 查询用户投保情况（上游 `/common/channel/api/policy/phone`） |
+| `/getUserInfoByPhoneNo` | 查询用户信息（上游 `/common/channel/api/getUserInfoByPhoneNo`，phoneNo 或 userId） |
+| `/getLiabilitiesByProductId` | 查询可选责任列表（上游 `/common/channel/api/getLiabilitiesByProductId`） |
+| `/getProductPricesByPolicyId` | 按保单 ID 查价格（上游 `/common/channel/api/getProductPricesByPolicyId`，仅需 policyId） |
+| `/getPolicyInfoByPolicyId` | 按保单 ID 查详情（上游 `/common/channel/api/getPolicyInfoByPolicyId`，仅需 policyId） |
 
 测试代码：`internal/huaan/client_integration_test.go`。
 
@@ -202,7 +211,7 @@ Authorization: Bearer <token>
 |------|-------------|--------|
 | 签名算法 | `go test ./internal/pkg/sign/...` | 与华安文档示例一致 |
 | 华安 HTTP 客户端 | `go test ./internal/huaan/...` | URL、key/sign 注入与 sign 开关 |
-| 华安真实环境 | `make test-huaan` | 10 接口可达、响应可解析 |
+| 华安真实环境 | `make test-huaan` | 17 接口可达、响应可解析 |
 | 渠道全流程 | 手动 / 脚本 POST `/upChannelApi/*` | 验签、PII、转发 |
 | 银行列表缓存 | 全流程 + 管理后台 | Redis / DB 命中不重复打华安 |
 
@@ -213,8 +222,130 @@ Authorization: Bearer <token>
 - [ ] `api/openapi.yaml` 与 README 同步
 - [ ] 全流程手动验证一条渠道请求
 - [ ] 样例写入 [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)，并与 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 对照
+- [ ] 若暂未联调通过，登记至下文 [§7 待测试接口列表](#7-待测试接口列表)
 
-## 7. 相关文档
+## 7. 待测试接口列表
+
+尚未完成**华安直连 + 渠道全流程**统一联调、或样例未采集的接口。批量联调时按本表逐项勾选；通过后移入对应样例文档并更新「采集状态 / 联调状态」。
+
+| 接口 | 渠道路径 | 华安路径 | 三要素 | 计划环境 | 状态 | 备注 |
+|------|----------|----------|--------|----------|------|------|
+| 获取渠道产品信息 | `POST /upChannelApi/product/info` | `POST /common/channel/api/product/info` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 2026-06-25 直连试跑：`code=500`，`message=未授权的访问来源`；待确认该域名下 `channelCode`、IP 白名单及是否须开启签名后统一联调 |
+| 获取用户短信验证码 | `POST /upChannelApi/sms/send` | `POST /common/channel/api/sms/send` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 新增接口，待与 product/info 一并联调 |
+| 短信验证码校验 | `POST /upChannelApi/sms/valid` | `POST /common/channel/api/sms/valid` | `mobile` + `smsCode` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 `data` 含三要素须加密；需先 sms/send 取得验证码 |
+| 免短信验证码注册登录 | `POST /upChannelApi/sms/noValid` | `POST /common/channel/api/sms/noValid` | `mobile` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 `data` 含三要素须加密；无需 smsCode |
+| 查询产品价格 | `POST /upChannelApi/priceByUser` | `POST /common/channel/api/priceByUser` | `idCard` + 业务字段 | `https://ins.api.hahealth.ink/` | **待测试** | `hasSocialSecurity` 为整数；`productPriceList` 可选 |
+| 查询用户投保情况 | `POST /upChannelApi/policy/phone` | `POST /common/channel/api/policy/phone` | `phoneNo` 或 `userId` | `https://ins.api.hahealth.ink/` | **待测试** | 仅返回基础版；`phoneNo`/`userId` 二选一 |
+| 查询可选责任列表 | `POST /upChannelApi/getLiabilitiesByProductId` | `POST /common/channel/api/getLiabilitiesByProductId` | `idCard` + 业务字段 | `https://ins.api.hahealth.ink/` | **待测试** | 配合 priceByUser；`productType` 1 体验版 2 正式版 |
+| 查询用户信息 | `POST /upChannelApi/getUserInfoByPhoneNo` | `POST /common/channel/api/getUserInfoByPhoneNo` | `phoneNo` 或 `userId` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 data 含三要素须加密 |
+
+### 7.1 单接口复现命令（product/info）
+
+华安直连（本服务 `huaan.Client`，PII 明文）：
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_NAME="张三" \
+HUAAN_TEST_ID_CARD="110101199001011234" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/productInfo'
+```
+
+渠道全流程（验签 + PII 加解密）：
+
+```bash
+# 见 scripts/channel_sim/main.go，或 POST http://localhost:5051/upChannelApi/product/info
+```
+
+### 7.2 单接口复现命令（sms/send）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_NAME="张三" \
+HUAAN_TEST_ID_CARD="110101199001011234" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsSend'
+```
+
+### 7.3 单接口复现命令（sms/valid）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_SMS_CODE="1234" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsValid'
+```
+
+### 7.4 单接口复现命令（sms/noValid）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsNoValid'
+```
+
+### 7.5 单接口复现命令（priceByUser）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PRODUCT_CODE="PROD2025001" \
+HUAAN_TEST_ID_CARD="110101199003071234" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/priceByUser'
+```
+
+### 7.6 单接口复现命令（policy/phone）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/policyByPhone'
+```
+
+或使用 `userId`：
+
+```bash
+HUAAN_TEST_USER_ID="USER2025001" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/policyByPhone'
+```
+
+### 7.8 单接口复现命令（getUserInfoByPhoneNo）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PHONE="13800138000" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/getUserInfoByPhoneNo'
+```
+
+或使用 `userId`：
+
+```bash
+HUAAN_TEST_USER_ID="xxx" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/getUserInfoByPhoneNo'
+```
+
+### 7.7 单接口复现命令（getLiabilitiesByProductId）
+
+```bash
+HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
+HUAAN_CHANNEL_CODE="你的渠道编码" \
+HUAAN_TEST_PRODUCT_CODE="PROD2025001" \
+HUAAN_TEST_ID_CARD="110101199003071234" \
+go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/liabilitiesByProductId'
+```
+
+联调通过后：
+
+1. 更新 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) 与 [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) 中对应接口节；
+2. 将上表该行状态改为「已通过」，或从本表删除。
+
+## 8. 相关文档
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 分层与数据流
 - [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档

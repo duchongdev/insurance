@@ -25,19 +25,28 @@ func TestBankItemsFromData(t *testing.T) {
 
 func TestBankFromMap(t *testing.T) {
 	b := bankFromMap(map[string]interface{}{
-		"bankCode":   "CCB",
-		"bankName":   "建设银行",
-		"debitCard":  float64(1),
-		"creditCard": float64(0),
+		"bankCode":     "CCB",
+		"bankName":     "建设银行",
+		"debitCard":    float64(1),
+		"creditCard":   float64(0),
+		"payChannelId": "pay-001",
+		"isActBank":    float64(1),
 	})
-	if b.BankCode != "CCB" || b.DebitCard != 1 || b.Status != 1 {
+	if b.BankCode != "CCB" || b.DebitCard != 1 || b.Status != 1 || b.PayChannelID != "pay-001" || b.IsActBank != 1 {
 		t.Fatalf("unexpected bank: %+v", b)
 	}
 }
 
 func TestBuildBankListResponseBytes(t *testing.T) {
 	raw, err := BuildBankListResponseBytes(banksFromData([]interface{}{
-		map[string]interface{}{"bankCode": "ICBC", "bankName": "工商银行", "debitCard": float64(1)},
+		map[string]interface{}{
+			"bankCode":     "ICBC",
+			"bankName":     "中国工商银行",
+			"debitCard":    float64(1),
+			"creditCard":   float64(1),
+			"payChannelId": "pay-icbc",
+			"isActBank":    float64(1),
+		},
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -49,8 +58,21 @@ func TestBuildBankListResponseBytes(t *testing.T) {
 	if int(resp["code"].(float64)) != 200 {
 		t.Fatalf("unexpected code: %v", resp["code"])
 	}
+	if resp["message"] != "成功" {
+		t.Fatalf("message=%v", resp["message"])
+	}
 	data, ok := resp["data"].([]interface{})
 	if !ok || len(data) != 1 {
 		t.Fatalf("unexpected data: %v", resp["data"])
+	}
+	item := data[0].(map[string]interface{})
+	if item["bankCode"] != "ICBC" || item["payChannelId"] != "pay-icbc" {
+		t.Fatalf("unexpected item: %+v", item)
+	}
+	if item["debitCard"] != "1" || item["creditCard"] != "1" {
+		t.Fatalf("card flags: %+v", item)
+	}
+	if int(item["isActBank"].(float64)) != 1 {
+		t.Fatalf("isActBank=%v", item["isActBank"])
 	}
 }

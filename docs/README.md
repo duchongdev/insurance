@@ -1,7 +1,10 @@
 # 项目文档
 
+> **开发前必读**：[../README.md](../README.md) 为项目**全局要求与标准**（架构分层、编码规范、Git/部署约定等）。本文档目录为专题文档索引。
+
 | 文档 | 说明 |
 |------|------|
+| [../README.md](../README.md) | **全局开发标准** + 项目说明、快速启动 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 系统架构：渠道层 / 华安层分离、数据流与代码结构 |
 | [TESTING.md](./TESTING.md) | 测试说明：华安直连集成测试、全流程测试、环境变量 |
 | [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) | 华安上游 10 个接口原始 JSON 样例与联调结论 |

@@ -57,7 +57,8 @@ func (c *Client) Call(ctx context.Context, apiPath string, body map[string]inter
 		body["sign"] = ""
 	}
 
-	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + c.cfg.HuaAn.APIPath + apiPath
+	upstreamPath := ResolveUpstreamPath(c.cfg.HuaAn.APIPath, apiPath)
+	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + upstreamPath
 	reqBytes, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)

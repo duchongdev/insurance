@@ -180,7 +180,7 @@ func (s *ProxyService) cacheBankList(ctx context.Context, channelCode string, re
 
 // respondBankListFromDB 命中数据库时构造渠道响应并回填 Redis。
 func (s *ProxyService) respondBankListFromDB(ctx context.Context, traceID, channelCode string) ([]byte, bool) {
-	banks, err := s.banks.ListEnabled()
+	banks, err := s.banks.ListAll()
 	if err != nil {
 		s.log.Warn("bank list db query failed",
 			zap.String("traceId", traceID),

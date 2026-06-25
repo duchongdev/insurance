@@ -22,6 +22,7 @@ const form = reactive({
   channelName: '',
   huaAnKey: '',
   channelKey: '',
+  callbackUrl: '',
 })
 
 const revealedIds = ref<Set<number>>(new Set())
@@ -33,6 +34,7 @@ function resetForm() {
   form.channelName = ''
   form.huaAnKey = ''
   form.channelKey = ''
+  form.callbackUrl = ''
 }
 
 function openCreateDialog() {
@@ -106,8 +108,8 @@ function onFilterChange() {
 }
 
 async function onCreate() {
-  if (!form.channelCode.trim() || !form.huaAnKey.trim()) {
-    ElMessage.warning('请填写渠道编码和华安密钥')
+  if (!form.channelCode.trim() || !form.huaAnKey.trim() || !form.callbackUrl.trim()) {
+    ElMessage.warning('请填写渠道编码、华安密钥和回调地址')
     return
   }
   creating.value = true
@@ -117,6 +119,7 @@ async function onCreate() {
       channelName: form.channelName.trim(),
       huaAnKey: form.huaAnKey.trim(),
       channelKey: form.channelKey.trim() || undefined,
+      callbackUrl: form.callbackUrl.trim(),
       status: 1,
     })
     createVisible.value = false
@@ -154,7 +157,7 @@ onMounted(loadData)
 
 <template>
   <div>
-    <PageToolbar title="渠道管理" subtitle="维护对接渠道编码与密钥">
+    <PageToolbar title="渠道管理" subtitle="维护对接渠道编码、密钥与投保结果回调地址">
       <template #filters>
         <el-input
           v-model="keyword"
@@ -191,6 +194,7 @@ onMounted(loadData)
         <el-table-column prop="channelName" label="渠道名称" min-width="120">
           <template #default="{ row }">{{ row.channelName || '—' }}</template>
         </el-table-column>
+        <el-table-column prop="callbackUrl" label="回调地址" min-width="200" show-overflow-tooltip />
         <el-table-column label="渠道密钥" min-width="240">
           <template #default="{ row }">
             <span class="secret-text">{{ displaySecret(row, 'channelKey') }}</span>
@@ -243,6 +247,9 @@ onMounted(loadData)
       </el-form-item>
       <el-form-item label="华安密钥" required>
         <el-input v-model="form.huaAnKey" placeholder="华安分配的 huaAnKey" show-password />
+      </el-form-item>
+      <el-form-item label="回调地址" required>
+        <el-input v-model="form.callbackUrl" placeholder="https://渠道域名/投保结果回调" />
       </el-form-item>
       <el-form-item label="渠道密钥">
         <el-input v-model="form.channelKey" placeholder="留空则自动生成 32 位十六进制" show-password />

@@ -10,7 +10,7 @@
 - **本服务**：验签、按渠道 PII 开关加解密、密钥替换、转发华安、银行列表缓存；渠道配置（含 PII 开关）缓存在 Redis，管理后台变更时同步更新。
 - **华安上游**：接收本服务转发的请求，使用华安分配的 `huaAnKey` 验签，三要素为明文。
 
-当前阶段以**透明转发**为主；`getBankList` 另有 Redis / 数据库多级缓存。
+当前阶段以**透明转发**为主；`getBankList` 另有 Redis / 数据库多级缓存。**投保结果回调**为华安 → 本服务 → 渠道反向转发（见 [CHANNEL_API.md §7](./CHANNEL_API.md#7-回调通知华安--本服务--渠道)）。
 
 ## 2. 分层架构
 
@@ -49,7 +49,7 @@ flowchart TB
 | 核心类型 | `huaan.Client` |
 | 职责 | 始终写入 `huaan.key` 与 `sign`（`sign_enabled=true` 时按规则生成，否则为空字符串）；POST 华安、返回**原始 JSON**（PII 明文） |
 | 入口方法 | `Client.Call(ctx, apiPath, body)` |
-| 路径常量 | `huaan.APIPaths`（10 个接口，与渠道路由一一对应） |
+| 路径常量 | `huaan.APIPaths`（17 个接口，与渠道路由一一对应；部分接口华安上游路径与渠道路径不同，见 `upstreamPathOverrides`） |
 
 ### 2.3 编排层
 
@@ -57,7 +57,7 @@ flowchart TB
 
 ```text
 Forward:  验签 → 读渠道缓存(piiEncrypted) → [getBankList 缓存] → [PII 解密] → huaan.Call → [写缓存] → [PII 加密] → 返回
-RefreshBankList:  huaan.Call("/getBankList") → 写 Redis / bank_info_t
+RefreshBankList:  huaan.Call(BankListPath) → 上游 /common/channel/api/getBankList → 写 Redis / bank_info_t
 Admin 渠道 CRUD:  写 MySQL → 同步更新/删除 Redis 渠道配置缓存
 ```
 
@@ -100,26 +100,34 @@ flowchart LR
 
 ## 3. 接口一一对应
 
-华安文档（`ZF保险.md`）中 `/upChannelApi` 下 10 个 POST 接口，在代码中**只维护一份路径列表**：
+华安文档（`ZF保险.md`）中 `/upChannelApi` 下 10 个 POST 接口，以及新增 **获取渠道产品信息**、**短信注册登录**、**查询产品价格** 等（渠道 `/product/info`、`/sms/*`、`/priceByUser` → 华安 `/common/channel/api/*`），在代码中**只维护一份路径列表**：
 
 ```go
 // internal/huaan/paths.go
 var APIPaths = []string{
-    "/proInsurance",
+    ProInsurancePath,             // 上游 /proxy/upChannelApi/proInsurance
     "/upGradeIns",
     "/getSignUrl",
     "/verifyNoCode",
     "/getPolicyInfoByPhoneNo",
     "/getProductPricesByProductCode",
-    "/getBankList",
+    BankListPath,                     // 上游 /common/channel/api/getBankList
     "/getProductInfoByChannel",
-    "/getProductPricesByPolicyId",
-    "/getPolicyInfoByPolicyId",
+    "/product/info",              // 上游 /common/channel/api/product/info
+    "/sms/send",                  // 上游 /common/channel/api/sms/send
+    "/sms/valid",                 // 上游 /common/channel/api/sms/valid
+    "/sms/noValid",               // 上游 /common/channel/api/sms/noValid
+    "/priceByUser",               // 上游 /common/channel/api/priceByUser
+    "/policy/phone",              // 上游 /common/channel/api/policy/phone
+    UserInfoByPhoneNoPath,        // 上游 /common/channel/api/getUserInfoByPhoneNo
+    "/getLiabilitiesByProductId", // 上游 /common/channel/api/getLiabilitiesByProductId
+    ProductPricesByPolicyIDPath,    // 上游 /common/channel/api/getProductPricesByPolicyId
+    PolicyInfoByPolicyIDPath,       // 上游 /common/channel/api/getPolicyInfoByPolicyId
 }
 ```
 
 - 渠道路由：`ChannelHandler.Register` 遍历 `huaan.APIPaths` 注册。
-- 华安调用：`huaan.Client.Call(ctx, path, ...)` 使用相同 path。
+- 华安调用：`huaan.Client.Call(ctx, path, ...)` 使用渠道路径；若存在 `upstreamPathOverrides` 则转发至对应华安路径。
 
 ## 4. 密钥与 PII 流转
 
@@ -165,7 +173,7 @@ sequenceDiagram
 | 2 | `bank_info_t` 数据库 | 否 |
 | 3 | 华安上游 | 是 |
 
-华安层测试应直接调用 `huaan.Client.Call("/getBankList", ...)`，**不走** Redis / DB 缓存。
+华安层测试应直接调用 `huaan.Client.Call(BankListPath, ...)`（上游 `/common/channel/api/getBankList`），**不走** Redis / DB 缓存。
 
 管理后台 `POST /admin/api/bank-list/refresh` 通过 `RefreshBankList` 直连华安并更新缓存。
 

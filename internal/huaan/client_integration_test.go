@@ -20,10 +20,13 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 	client, env := huaan.NewTestClient(t)
 
 	cases := []struct {
-		name    string
-		path    string
-		needPII bool
-		fields  map[string]interface{}
+		name            string
+		path            string
+		needPII         bool
+		needMobile      bool
+		needIdCard      bool
+		needPhoneOrUser bool
+		fields          map[string]interface{}
 	}{
 		{
 			name:   "getBankList",
@@ -31,9 +34,56 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 			fields: nil,
 		},
 		{
-			name:   "getProductInfoByChannel",
-			path:   "/getProductInfoByChannel",
-			fields: nil,
+			name:    "productInfo",
+			path:    huaan.ProductInfoPath,
+			needPII: true,
+			fields:  nil,
+		},
+		{
+			name:    "smsSend",
+			path:    huaan.SmsSendPath,
+			needPII: true,
+			fields:  nil,
+		},
+		{
+			name:       "smsValid",
+			path:       huaan.SmsValidPath,
+			fields:     map[string]interface{}{"smsCode": os.Getenv("HUAAN_TEST_SMS_CODE")},
+			needMobile: true,
+		},
+		{
+			name:       "smsNoValid",
+			path:       huaan.SmsNoValidPath,
+			needMobile: true,
+		},
+		{
+			name:       "priceByUser",
+			path:       huaan.PriceByUserPath,
+			needIdCard: true,
+			fields: map[string]interface{}{
+				"productCode":       os.Getenv("HUAAN_TEST_PRODUCT_CODE"),
+				"hasSocialSecurity": 1,
+			},
+		},
+		{
+			name:            "policyByPhone",
+			path:            huaan.PolicyByPhonePath,
+			needPhoneOrUser: true,
+		},
+		{
+			name:            "getUserInfoByPhoneNo",
+			path:            huaan.UserInfoByPhoneNoPath,
+			needPhoneOrUser: true,
+		},
+		{
+			name:       "liabilitiesByProductId",
+			path:       huaan.LiabilitiesByProductIDPath,
+			needIdCard: true,
+			fields: map[string]interface{}{
+				"productCode":       os.Getenv("HUAAN_TEST_PRODUCT_CODE"),
+				"hasSocialSecurity": 1,
+				"productType":       1,
+			},
 		},
 		{
 			name:    "getPolicyInfoByPhoneNo",
@@ -62,6 +112,46 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 				fields["phoneNo"] = env.Phone
 				fields["name"] = env.Name
 				fields["idCard"] = env.IDCard
+			}
+			if tc.needMobile {
+				if env.Phone == "" {
+					t.Skip("跳过：请设置 HUAAN_TEST_PHONE")
+				}
+				if fields == nil {
+					fields = map[string]interface{}{}
+				}
+				fields["mobile"] = env.Phone
+				if _, ok := tc.fields["smsCode"]; ok {
+					code, _ := fields["smsCode"].(string)
+					if code == "" {
+						t.Skip("跳过：请设置 HUAAN_TEST_SMS_CODE")
+					}
+				}
+			}
+			if tc.needIdCard {
+				if env.IDCard == "" {
+					t.Skip("跳过：请设置 HUAAN_TEST_ID_CARD")
+				}
+				if fields == nil {
+					fields = map[string]interface{}{}
+				}
+				fields["idCard"] = env.IDCard
+				code, _ := fields["productCode"].(string)
+				if code == "" {
+					t.Skip("跳过：请设置 HUAAN_TEST_PRODUCT_CODE")
+				}
+			}
+			if tc.needPhoneOrUser {
+				if fields == nil {
+					fields = map[string]interface{}{}
+				}
+				if env.Phone != "" {
+					fields["phoneNo"] = env.Phone
+				} else if uid := os.Getenv("HUAAN_TEST_USER_ID"); uid != "" {
+					fields["userId"] = uid
+				} else {
+					t.Skip("跳过：请设置 HUAAN_TEST_PHONE 或 HUAAN_TEST_USER_ID")
+				}
 			}
 
 			body := huaan.BuildRequestBody(env.ChannelCode, fields)
@@ -106,7 +196,7 @@ func TestHuaAnDirect_ProductFromChannel(t *testing.T) {
 			})
 
 			t.Run("proInsurance", func(t *testing.T) {
-				const path = "/proInsurance"
+				const path = huaan.ProInsurancePath
 				body := huaan.BuildRequestBody(env.ChannelCode, baseFields)
 				huaan.LogRequest(t, path, body)
 				result, err := client.Call(ctx, path, body)
@@ -138,40 +228,34 @@ func TestHuaAnDirect_PolicyFromProInsurance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proInsurance: %v", err)
 	}
-	huaan.LogResponse(t, "/proInsurance", insResult)
+	huaan.LogResponse(t, huaan.ProInsurancePath, insResult)
 	t.Logf("选用保单（来自 proInsurance）: policyId=%s userId=%s policyStatus=%s",
 		insParsed.PolicyID, insParsed.UserID, insParsed.PolicyStatus)
 
 	policyID := insParsed.PolicyID
 
 	t.Run("getPolicyInfoByPolicyId", func(t *testing.T) {
-		const path = "/getPolicyInfoByPolicyId"
 		body := huaan.BuildRequestBody(env.ChannelCode, map[string]interface{}{
 			"policyId": policyID,
 		})
-		huaan.LogRequest(t, path, body)
-		result, err := client.Call(ctx, path, body)
+		huaan.LogRequest(t, huaan.PolicyInfoByPolicyIDPath, body)
+		result, err := client.Call(ctx, huaan.PolicyInfoByPolicyIDPath, body)
 		if err != nil {
-			t.Fatalf("Call %s: %v", path, err)
+			t.Fatalf("Call %s: %v", huaan.PolicyInfoByPolicyIDPath, err)
 		}
-		huaan.LogResponse(t, path, result)
+		huaan.LogResponse(t, huaan.PolicyInfoByPolicyIDPath, result)
 	})
 
 	t.Run("getProductPricesByPolicyId", func(t *testing.T) {
-		const path = "/getProductPricesByPolicyId"
 		body := huaan.BuildRequestBody(env.ChannelCode, map[string]interface{}{
-			"policyId":          policyID,
-			"hasSocialSecurity": defaultHasSocialSecurity,
-			"phoneNo":           env.Phone,
-			"name":              env.Name,
-			"idCard":            env.IDCard,
+			"policyId": policyID,
 		})
-		huaan.LogRequest(t, path, body)
-		result, err := client.Call(ctx, path, body)
+		huaan.LogRequest(t, huaan.ProductPricesByPolicyIDPath, body)
+		result, err := client.Call(ctx, huaan.ProductPricesByPolicyIDPath, body)
 		if err != nil {
-			t.Fatalf("Call %s: %v", path, err)
+			t.Fatalf("Call %s: %v", huaan.ProductPricesByPolicyIDPath, err)
 		}
-		huaan.LogResponse(t, path, result)
+		huaan.LogResponse(t, huaan.ProductPricesByPolicyIDPath, result)
 	})
 
 	t.Run("upGradeIns", func(t *testing.T) {
@@ -206,7 +290,7 @@ func TestHuaAnDirect_GetSignUrl(t *testing.T) {
 	if err != nil {
 		t.Fatalf("proInsurance: %v", err)
 	}
-	huaan.LogResponse(t, "/proInsurance", insResult)
+	huaan.LogResponse(t, huaan.ProInsurancePath, insResult)
 	policyID := insParsed.PolicyID
 	userID := insParsed.UserID
 	if userID == "" {
@@ -281,7 +365,9 @@ func fetchChannelProducts(t *testing.T, ctx context.Context, client *huaan.Clien
 func insuranceFields(env huaan.EnvTestConfig, productCode string) map[string]interface{} {
 	return map[string]interface{}{
 		"productCode":       productCode,
-		"hasSocialSecurity": defaultHasSocialSecurity,
+		"hasSocialSecurity": 1,
+		"isUpgrade":         0,
+		"autoRenew":         1,
 		"phoneNo":           env.Phone,
 		"name":              env.Name,
 		"idCard":            env.IDCard,
@@ -293,11 +379,19 @@ func TestHuaAnDirect_APIPathsComplete(t *testing.T) {
 	covered := map[string]bool{
 		huaan.BankListPath:               true,
 		"/getProductInfoByChannel":       true,
+		huaan.ProductInfoPath:            true, // TestHuaAnDirect_AllPaths/productInfo
+		huaan.SmsSendPath:                true, // TestHuaAnDirect_AllPaths/smsSend
+		huaan.SmsValidPath:               true, // TestHuaAnDirect_AllPaths/smsValid
+		huaan.SmsNoValidPath:             true, // TestHuaAnDirect_AllPaths/smsNoValid
+		huaan.PriceByUserPath:            true, // TestHuaAnDirect_AllPaths/priceByUser
+		huaan.PolicyByPhonePath:          true, // TestHuaAnDirect_AllPaths/policyByPhone
+		huaan.UserInfoByPhoneNoPath:      true, // TestHuaAnDirect_AllPaths/getUserInfoByPhoneNo
+		huaan.LiabilitiesByProductIDPath: true, // TestHuaAnDirect_AllPaths/liabilitiesByProductId
 		"/getProductPricesByProductCode": true, // TestHuaAnDirect_ProductFromChannel
 		"/getPolicyInfoByPhoneNo":        true,
-		"/getPolicyInfoByPolicyId":       true, // TestHuaAnDirect_PolicyFromProInsurance
-		"/getProductPricesByPolicyId":    true, // TestHuaAnDirect_PolicyFromProInsurance
-		"/proInsurance":                  true, // TestHuaAnDirect_ProductFromChannel
+		huaan.PolicyInfoByPolicyIDPath:       true, // TestHuaAnDirect_PolicyFromProInsurance
+		huaan.ProductPricesByPolicyIDPath: true, // TestHuaAnDirect_PolicyFromProInsurance
+		huaan.ProInsurancePath:           true, // TestHuaAnDirect_ProductFromChannel
 		"/upGradeIns":                    true, // TestHuaAnDirect_PolicyFromProInsurance
 		"/getSignUrl":                    true, // TestHuaAnDirect_GetSignUrl
 		"/verifyNoCode":                  true,

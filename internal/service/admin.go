@@ -88,6 +88,9 @@ func (s *AdminService) ListChannels(page, size int) ([]model.Channel, int64, err
 
 // CreateChannel 创建渠道；ChannelKey 为空时调用 GenerateChannelKey 自动生成。
 func (s *AdminService) CreateChannel(ch *model.Channel) error {
+	if err := ValidateChannelConfig(ch); err != nil {
+		return err
+	}
 	if ch.ChannelKey == "" {
 		ch.ChannelKey = GenerateChannelKey()
 	}
@@ -96,6 +99,9 @@ func (s *AdminService) CreateChannel(ch *model.Channel) error {
 
 // UpdateChannel 全量更新渠道记录（GORM Save）。
 func (s *AdminService) UpdateChannel(ch *model.Channel) error {
+	if err := ValidateChannelConfig(ch); err != nil {
+		return err
+	}
 	return s.channels.Update(ch)
 }
 

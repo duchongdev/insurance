@@ -95,14 +95,18 @@ func main() {
 	api := r.Group(cfg.HuaAn.APIPath)
 	channelHandler.Register(api)
 
+	callbackHandler := handler.NewCallbackHandler(proxySvc)
+	callbackHandler.Register(r)
+
 	adminHandler := handler.NewAdminHandler(adminSvc, proxySvc)
 	adminHandler.Register(r.Group("/admin/api"))
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"service": "insurance-bridge",
-			"admin":   "/admin/",
-			"health":  "/health/ready",
+			"service":  "insurance-bridge",
+			"admin":    "/admin/",
+			"health":   "/health/ready",
+			"callback": "/huaan/callback/insureNotify",
 		})
 	})
 	r.StaticFile("/openapi.yaml", "api/openapi.yaml")

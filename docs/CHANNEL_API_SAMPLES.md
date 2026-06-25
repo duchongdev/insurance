@@ -44,34 +44,42 @@ Content-Type: application/json; charset=utf-8
 
 | 接口 | 路径 | 三要素 | 采集状态 |
 |------|------|--------|----------|
-| getBankList | `/upChannelApi/getBankList` | 否 | 待采集 |
+| getBankList | `/upChannelApi/getBankList` | 是 | 2026-06-25（路径/字段对齐规范） |
 | getProductInfoByChannel | `/upChannelApi/getProductInfoByChannel` | 否 | 待采集 |
+| product/info | `/upChannelApi/product/info` | 是 | **待测试** |
+| sms/send | `/upChannelApi/sms/send` | 是 | **待测试** |
+| sms/valid | `/upChannelApi/sms/valid` | 是 | **待测试** |
+| sms/noValid | `/upChannelApi/sms/noValid` | 是 | **待测试** |
+| priceByUser | `/upChannelApi/priceByUser` | 是 | **待测试** |
+| policy/phone | `/upChannelApi/policy/phone` | 是 | **待测试** |
+| getUserInfoByPhoneNo | `/upChannelApi/getUserInfoByPhoneNo` | 是 | **待测试** |
+| getLiabilitiesByProductId | `/upChannelApi/getLiabilitiesByProductId` | 是 | **待测试** |
 | proInsurance | `/upChannelApi/proInsurance` | 是 | 2026-06-02（华安样例已对齐） |
 | upGradeIns | `/upChannelApi/upGradeIns` | 否 | 待采集 |
 | getSignUrl | `/upChannelApi/getSignUrl` | 否 | 待采集 |
 | verifyNoCode | `/upChannelApi/verifyNoCode` | 是 | 待采集 |
 | getPolicyInfoByPhoneNo | `/upChannelApi/getPolicyInfoByPhoneNo` | 是 | 待采集 |
 | getProductPricesByProductCode | `/upChannelApi/getProductPricesByProductCode` | 是 | 2026-06-02（华安样例已对齐） |
-| getProductPricesByPolicyId | `/upChannelApi/getProductPricesByPolicyId` | 否 | 待采集 |
-| getPolicyInfoByPolicyId | `/upChannelApi/getPolicyInfoByPolicyId` | 否 | 待采集 |
+| getProductPricesByPolicyId | `/upChannelApi/getProductPricesByPolicyId` | 否 | 2026-06-25（路径/字段对齐规范） |
+| getPolicyInfoByPolicyId | `/upChannelApi/getPolicyInfoByPolicyId` | 否（响应含 PII） | 2026-06-25（路径/字段对齐规范） |
 
 以下各节按上表顺序填写；**待采集**接口保留占位，联调通过后补充 JSON 并更新索引表「采集状态」。
 
 ---
 
-## getBankList — 获取银行列表
+## getBankList — 获取支持的银行列表
 
 | 项 | 值 |
 |----|-----|
-| 路径 | `POST {平台域名}/upChannelApi/getBankList` |
+| 路径 | `POST {平台域名}/upChannelApi/getBankList`（转发华安 `/common/channel/api/getBankList`） |
 | 采集时间 | — |
 | 环境 | — |
 | 渠道编码 | — |
-| 对照华安样例 | [HUAAN_API_SAMPLES.md#getbanklist--获取银行列表](./HUAAN_API_SAMPLES.md#getbanklist--获取银行列表) |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getbanklist--获取支持的银行列表](./HUAAN_API_SAMPLES.md#getbanklist--获取支持的银行列表) |
 
 ### 请求体（渠道 → 本服务）
 
-> 待采集。本接口无三要素字段；`sign` 使用渠道 `channelKey` 计算。
+本接口无三要素；请求体含公共签名字段，华安侧仅需 `channelCode`（本服务转发时补齐 timestamp/key/sign）。
 
 ```json
 {
@@ -84,20 +92,30 @@ Content-Type: application/json; charset=utf-8
 
 ### 响应体（本服务 → 渠道）
 
-> 待采集。`data` 结构与华安一致；若命中 Redis / `bank_info_t` 缓存，渠道侧响应与直连华安可能相同（均无三要素）。
-
 ```json
 {
   "code": 200,
-  "message": "操作成功",
-  "data": []
+  "message": "成功",
+  "data": [
+    {
+      "bankName": "中国工商银行",
+      "bankCode": "ICBC",
+      "debitCard": "1",
+      "creditCard": "1",
+      "payChannelId": "xxx",
+      "isActBank": 1
+    }
+  ]
 }
 ```
+
+若命中 Redis，为华安原始 JSON（可能含历史字段如 `sortOrder`）；若仅命中 `bank_info_t`，返回上述规范字段。
 
 ### 与华安原文对照
 
 | 差异点 | 渠道侧（本文档） | 华安原文 |
 |--------|------------------|----------|
+| 华安 URL | 本服务拼 `/common/channel/api/getBankList` | 同左 |
 | 签名 | 渠道 `channelKey` | 华安 `huaAnKey` 或关闭签名 |
 | 三要素 | 无 | 无 |
 | 数据来源 | 可能来自缓存，不必然实时打华安 | 直连华安 |
@@ -140,19 +158,270 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
 
 ---
 
-## proInsurance — 投保
+## product/info — 获取渠道产品信息
 
 | 项 | 值 |
 |----|-----|
-| 路径 | `POST {平台域名}/upChannelApi/proInsurance` |
-| 采集时间 | 2026-06-02 |
-| 对照华安样例 | [HUAAN_API_SAMPLES.md#proinsurance--投保](./HUAAN_API_SAMPLES.md#proinsurance--投保) |
-
-`productCode` 来自 `getProductInfoByChannel`；字段结构与华安一致，渠道侧三要素须 AES-GCM 密文。
+| 路径 | `POST {平台域名}/upChannelApi/product/info` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/product/info` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#productinfo--获取渠道产品信息](./HUAAN_API_SAMPLES.md#productinfo--获取渠道产品信息) |
 
 ### 请求体（渠道 → 本服务）
 
-与华安字段相同，三要素为密文（示例结构）：
+> 待测试。须带公共字段 + `phoneNo`（三要素密文）。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。预期 `data` 含 `productCode`、`productName`、`companyName`、`productType`、`channelCode`。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 三要素 | `phoneNo` 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/product/info` | `/common/channel/api/product/info`（非 `/upChannelApi` 前缀） |
+
+---
+
+## sms/send — 获取用户短信验证码
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/sms/send` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/sms/send` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#smssend--获取用户短信验证码](./HUAAN_API_SAMPLES.md#smssend--获取用户短信验证码) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。须带公共字段 + `phoneNo`（三要素密文）。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。预期 `data` 为字符串，如 `"验证码发送成功"`。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 三要素 | `phoneNo` 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/sms/send` | `/common/channel/api/sms/send` |
+
+---
+
+## sms/valid — 短信验证码校验
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/sms/valid` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/sms/valid` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验](./HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。须带公共字段 + `mobile`（加密）+ `smsCode`（明文）。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。预期 `data` 含 `userId`、`idCard`、`name`、`phoneNo`、`channelCode`（三要素字段为密文）。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 手机号字段 | 请求 `mobile` 须加密 | 明文 `mobile` |
+| 三要素响应 | `data` 内 PII 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/sms/valid` | `/common/channel/api/sms/valid` |
+
+---
+
+## sms/noValid — 免短信验证码注册登录
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/sms/noValid` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/sms/noValid` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#smsnovalid--免短信验证码注册登录](./HUAAN_API_SAMPLES.md#smsnovalid--免短信验证码注册登录) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。须带公共字段 + `mobile`（加密）。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。预期 `data` 含 `userId`、`idCard`、`name`、`phoneNo`、`channelCode`（三要素字段为密文）。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 手机号字段 | 请求 `mobile` 须加密 | 明文 `mobile` |
+| 三要素响应 | `data` 内 PII 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/sms/noValid` | `/common/channel/api/sms/noValid` |
+
+---
+
+## priceByUser — 查询产品价格
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/priceByUser` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/priceByUser` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#pricebyuser--查询产品价格](./HUAAN_API_SAMPLES.md#pricebyuser--查询产品价格) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。须带 `productCode`、`idCard`（加密）、`hasSocialSecurity`（整数）；`productPriceList` 可选。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。预期 `data` 含产品价格与生效天数等字段（无三要素）。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 身份证 | 请求 `idCard` 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/priceByUser` | `/common/channel/api/priceByUser` |
+
+---
+
+## policy/phone — 查询用户投保情况
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/policy/phone` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/policy/phone` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#policyphone--查询用户投保情况](./HUAAN_API_SAMPLES.md#policyphone--查询用户投保情况) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。`phoneNo`（加密）与 `userId` 至少传一项。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。`data` 为基础版产品数组；`insuredList` 等 PII 字段为密文。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 手机号 | 请求 `phoneNo` 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/policy/phone` | `/common/channel/api/policy/phone` |
+
+---
+
+## getUserInfoByPhoneNo — 查询用户信息
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/getUserInfoByPhoneNo` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/getUserInfoByPhoneNo` |
+| 采集时间 | 2026-06-25 |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getuserinfobyphoneno--查询用户信息](./HUAAN_API_SAMPLES.md#getuserinfobyphoneno--查询用户信息) |
+
+### 请求体（渠道 → 本服务）
+
+`phoneNo`（加密）与 `userId` 至少传一项。
+
+```json
+{
+  "timestamp": "1717300000000",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "***",
+  "sign": "***",
+  "phoneNo": "AES-GCM-Base64-密文"
+}
+```
+
+### 响应体（本服务 → 渠道）
+
+结构与华安一致；`phoneNo`/`name`/`idCard` 为 **AES 密文**（示例为脱敏明文）：
+
+```json
+{
+  "code": 200,
+  "message": "请求成功",
+  "data": {
+    "userId": "xxx",
+    "idCard": "xxx",
+    "name": "xxx",
+    "phoneNo": "xxx",
+    "channelCode": "xxx"
+  }
+}
+```
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 手机号 | 请求 `phoneNo` 须加密 | 明文 |
+| 三要素 | 响应须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/getUserInfoByPhoneNo` | `/common/channel/api/getUserInfoByPhoneNo` |
+
+---
+
+## getLiabilitiesByProductId — 查询可选责任列表
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/getLiabilitiesByProductId` |
+| 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/getLiabilitiesByProductId` |
+| 采集时间 | — |
+| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getliabilitiesbyproductid--查询可选责任列表](./HUAAN_API_SAMPLES.md#getliabilitiesbyproductid--查询可选责任列表) |
+
+### 请求体（渠道 → 本服务）
+
+> 待测试。须带 `productCode`、`idCard`（加密）、`hasSocialSecurity`、`productType`（1 体验版 2 正式版）。
+
+### 响应体（本服务 → 渠道）
+
+> 待测试。`data` 为责任项数组，可组装为 priceByUser 的 `productPriceList`。
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 签名 | 渠道密钥 | 华安密钥或空 |
+| 身份证 | 请求 `idCard` 须加密 | 明文 |
+| 上游路径 | 本服务 `/upChannelApi/getLiabilitiesByProductId` | `/common/channel/api/getLiabilitiesByProductId` |
+
+---
+
+## proInsurance — 预投保
+
+| 项 | 值 |
+|----|-----|
+| 路径 | `POST {平台域名}/upChannelApi/proInsurance`（本服务转发华安 `POST /proxy/upChannelApi/proInsurance`） |
+| 采集时间 | 2026-06-02（字段 2026-06-25 对齐规范） |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#proinsurance--预投保](./HUAAN_API_SAMPLES.md#proinsurance--预投保) |
+
+姓名、证件号录入后发起预投保；`code=200` 则继续投保。`productCode` 通常来自 `getProductInfoByChannel` 或产品查询类接口。
+
+### 请求体（渠道 → 本服务）
+
+与华安字段相同，三要素为密文：
 
 ```json
 {
@@ -160,38 +429,48 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
   "channelCode": "YOUR_CHANNEL_CODE",
   "key": "YOUR_CHANNEL_KEY",
   "sign": "YOUR_SIGN",
-  "productCode": "ZFHLW1041001",
-  "hasSocialSecurity": "1",
+  "productCode": "PROD2025001",
   "phoneNo": "Base64密文(手机号)",
   "name": "Base64密文(姓名)",
-  "idCard": "Base64密文(身份证号)"
+  "idCard": "Base64密文(身份证号)",
+  "hasSocialSecurity": 1,
+  "isUpgrade": 0,
+  "autoRenew": 1,
+  "productPriceList": [
+    {
+      "liabilityName": "罕见保险金",
+      "price": 0.0,
+      "kindCode": "102",
+      "uwCount": 10
+    }
+  ]
 }
 ```
 
 ### 响应体（本服务 → 渠道）
 
-`data` 与华安一致（本接口响应无 PII 需加密字段）：
+规范成功响应（华安可能额外返回 `userId`、`policyStatus` 等，本服务原样转发）：
 
 ```json
 {
   "code": 200,
-  "message": "操作成功",
+  "message": "成功",
   "data": {
-    "policyId": "9697d878b6474c619fa43ffa9ca3b4b0",
-    "policyStatus": "0",
-    "userId": "5c819c252ab343e2a2a6df98b3a014ab"
+    "policyId": "xxx",
+    "policyNo": "xxx"
   }
 }
 ```
 
-`productCode=ZFHLW1040003` 时实测 `policyId` 为 `ab185a401820431aad4be32c329ab003`，见华安样例文档。
+历史实测（旧环境）仍可见 `policyStatus`、`userId`，见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)。
 
 ### 与华安原文对照
 
 | 差异点 | 渠道侧 | 华安原文 |
 |--------|--------|----------|
 | 三要素 | 请求须密文 | 明文（直连华安） |
-| `data` 字段 | `policyId` / `policyStatus` / `userId` 一致 | 同上 |
+| 华安 URL | 本服务拼 `/proxy/upChannelApi/proInsurance` | 同左（非 `/upChannelApi/proInsurance`） |
+| `hasSocialSecurity` / `isUpgrade` / `autoRenew` | 整数 | 整数 |
 | 网关错误 | 可能出现 `401`/`400` 等本服务错误码 | 无 |
 
 ---
@@ -316,31 +595,134 @@ curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
 
 ---
 
-## getProductPricesByPolicyId — 按保单 ID 报价
+## getProductPricesByPolicyId — 按保单 ID 查价格（收银台）
 
 | 项 | 值 |
 |----|-----|
-| 路径 | `POST {平台域名}/upChannelApi/getProductPricesByPolicyId` |
-| 采集时间 | — |
-| 对照华安样例 | [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)（对应章节） |
+| 路径 | `POST {平台域名}/upChannelApi/getProductPricesByPolicyId`（转发华安 `/common/channel/api/getProductPricesByPolicyId`） |
+| 采集时间 | 2026-06-25 |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getproductpricesbypolicyid--按保单-id-查价格收银台](./HUAAN_API_SAMPLES.md#getproductpricesbypolicyid--按保单-id-查价格收银台) |
 
-### 请求体 / 响应体
+### 请求体（渠道 → 本服务）
 
-> 待采集。
+仅需 `policyId` 与公共签名字段，无三要素。
+
+```json
+{
+  "timestamp": "1717300000000",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "***",
+  "sign": "***",
+  "policyId": "POL2026060500001"
+}
+```
+
+### 响应体（本服务 → 渠道）
+
+```json
+{
+  "code": 200,
+  "message": "成功",
+  "data": {
+    "productCode": "PROD2025001",
+    "productName": "基础版医疗险",
+    "price": 128.0,
+    "historyBinds": [
+      {
+        "bankName": "中国工商银行",
+        "bankCode": "ICBC",
+        "isPaySuccess": 1
+      }
+    ]
+  }
+}
+```
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 华安 URL | 本服务拼 `/common/channel/api/getProductPricesByPolicyId` | 同左 |
+| 三要素 | 不需要 | 不需要 |
+| 响应 | 原样转发 | 同左 |
 
 ---
 
-## getPolicyInfoByPolicyId — 按保单 ID 查询
+## getPolicyInfoByPolicyId — 根据保单 ID 查询保单信息
 
 | 项 | 值 |
 |----|-----|
-| 路径 | `POST {平台域名}/upChannelApi/getPolicyInfoByPolicyId` |
-| 采集时间 | — |
-| 对照华安样例 | [HUAAN_API_SAMPLES.md#getpolicyinfobypolicyid--保单id查信息](./HUAAN_API_SAMPLES.md#getpolicyinfobypolicyid--保单id查信息) |
+| 路径 | `POST {平台域名}/upChannelApi/getPolicyInfoByPolicyId`（转发华安 `/common/channel/api/getPolicyInfoByPolicyId`） |
+| 采集时间 | 2026-06-25 |
+| 对照华安样例 | [HUAAN_API_SAMPLES.md#getpolicyinfobypolicyid--根据保单-id-查询保单信息](./HUAAN_API_SAMPLES.md#getpolicyinfobypolicyid--根据保单-id-查询保单信息) |
 
-### 请求体 / 响应体
+### 请求体（渠道 → 本服务）
 
-> 待采集。华安响应 `insuredList` 等含三要素；经本服务返回后为密文。
+仅需 `policyId` 与公共签名字段。
+
+```json
+{
+  "timestamp": "1717300000000",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "***",
+  "sign": "***",
+  "policyId": "POL2026060500001"
+}
+```
+
+### 响应体（本服务 → 渠道）
+
+结构与华安一致；`phoneNo`/`name`/`idCard` 及 `insuredList` 内三要素为 **AES 密文**（示例为脱敏明文）：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "insuredList": [
+      {
+        "insuredCardNo": "341xxxxxxx18",
+        "hasSocialSecurity": "1",
+        "insuredName": "xxx",
+        "phoneNo": "18xxxxxx1"
+      }
+    ],
+    "optionalRiskList": [],
+    "productId": "ccxxxx8da3a9ca057772a",
+    "idCard": "3xxxxxxxxxxxx8",
+    "hasSocialSecurity": "1",
+    "policyEndDate": "2026-06-27",
+    "policyStartDate": "2026-05-29",
+    "policyStatus": "6",
+    "productName": "百万医疗险-体验版",
+    "phoneNo": "18xxxxx1",
+    "productCode": "ZFxxx41001",
+    "policyId": "f8xxxxx339d7795c1",
+    "payPremium": 0.65,
+    "riskList": [
+      {
+        "riskName": "一般医疗保险金、重大疾病医疗保险金",
+        "riskCode": null
+      },
+      {
+        "riskName": "罕见特定恶性肿瘤—重度疾病保险金",
+        "riskCode": "1038102"
+      }
+    ],
+    "createTime": "2026-05-28",
+    "name": "李xxx",
+    "autoRenew": null
+  }
+}
+```
+
+### 与华安原文对照
+
+| 差异点 | 渠道侧 | 华安原文 |
+|--------|--------|----------|
+| 华安 URL | 本服务拼 `/common/channel/api/getPolicyInfoByPolicyId` | 同左 |
+| 三要素 | 响应须加密 | 明文 |
+| 请求 | 仅需 policyId + 验签 | 仅需 policyId + channelCode 等 |
 
 ---
 

@@ -11,6 +11,7 @@ export interface Channel {
   channelName?: string
   channelKey: string
   huaAnKey: string
+  callbackUrl: string
   status: number
   remark?: string
   createdAt?: string
