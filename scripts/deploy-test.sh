@@ -109,5 +109,5 @@ ssh "$DEPLOY_HOST" "APP_PORT=\$(grep -E '^APP_PORT=' ${DEPLOY_DIR}/.env 2>/dev/n
   || die "健康检查失败: ssh ${DEPLOY_HOST} 'cd ${DEPLOY_DIR} && docker compose logs bridge nginx'"
 
 info "部署完成"
-info "  管理后台: http://10.41.61.41:5051/admin/"
+info "  管理后台: http://10.41.61.41:5051/ （自动进入 /admin/）"
 info "  健康检查: http://10.41.61.41:5051/health/ready"

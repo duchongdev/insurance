@@ -24,24 +24,35 @@ function logout() {
 <template>
   <el-container class="layout">
     <el-aside width="220px" class="aside">
-      <div class="logo">华安渠道对接</div>
-      <el-menu :default-active="activeMenu" router background-color="#001529" text-color="#ffffffa6" active-text-color="#fff">
+      <div class="logo">
+        <span class="logo__mark">HA</span>
+        <span class="logo__text">华安渠道对接</span>
+      </div>
+      <el-menu
+        :default-active="activeMenu"
+        router
+        class="sidebar-menu"
+        background-color="transparent"
+        text-color="#ffffff"
+        active-text-color="#ffffff"
+      >
         <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.title }}</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
-    <el-container>
-      <el-header class="header">
-        <span class="title">华安保险渠道对接平台</span>
-        <el-button type="danger" plain @click="logout">退出</el-button>
-      </el-header>
-      <el-main class="main">
-        <el-breadcrumb separator="/" class="breadcrumb">
+
+    <el-container class="main-container">
+      <el-header class="top-bar" height="48px">
+        <el-breadcrumb separator="/">
           <el-breadcrumb-item>管理后台</el-breadcrumb-item>
           <el-breadcrumb-item>{{ route.meta.title as string }}</el-breadcrumb-item>
         </el-breadcrumb>
+        <el-button class="logout-btn" text @click="logout">退出登录</el-button>
+      </el-header>
+
+      <el-main class="main">
         <router-view />
       </el-main>
     </el-container>
@@ -52,39 +63,101 @@ function logout() {
 .layout {
   min-height: 100vh;
 }
+
 .aside {
-  background: #001529;
+  background: var(--color-bg-sidebar);
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+  overflow-y: auto;
 }
+
 .logo {
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  padding: 20px 16px;
-  border-bottom: 1px solid #ffffff1a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.header {
+
+.logo__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.logo__text {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sidebar-menu {
+  border-right: none;
+  padding: 8px;
+}
+
+.sidebar-menu :deep(.el-menu-item) {
+  height: 40px;
+  line-height: 40px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.main-container {
+  margin-left: 220px;
+  min-height: 100vh;
+  background: var(--color-bg-page);
+}
+
+.top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border-bottom: 1px solid #ebeef5;
+  padding: 0 20px;
+  background: var(--color-bg-card);
+  border-bottom: 1px solid var(--color-border);
 }
-.title {
-  font-size: 18px;
-  font-weight: 600;
-}
-.main {
-  background: #f5f7fa;
-  min-height: calc(100vh - 60px);
-}
-.breadcrumb {
-  margin-bottom: 16px;
-}
-</style>
 
-<style>
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+.top-bar :deep(.el-breadcrumb__inner) {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.top-bar :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.logout-btn {
+  color: var(--color-text-secondary);
+}
+
+.logout-btn:hover {
+  color: var(--color-primary);
+}
+
+.main {
+  padding: 16px 20px 24px;
+  min-height: calc(100vh - 48px);
 }
 </style>

@@ -73,7 +73,7 @@ fi
 
 echo
 echo "[start] 启动完成"
-echo "  管理后台: http://<服务器IP>:${APP_PORT}/admin/"
+echo "  管理后台: http://<服务器IP>:${APP_PORT}/"
 echo "  健康检查: http://<服务器IP>:${APP_PORT}/health/ready"
 echo "  查看日志: $COMPOSE logs -f nginx bridge"
 echo "  停止服务: ./scripts/stop.sh"
