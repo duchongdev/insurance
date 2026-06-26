@@ -28,7 +28,7 @@ type caseDef struct {
 }
 
 func main() {
-	baseURL := env("BRIDGE_BASE_URL", "http://10.41.61.41:5051")
+	baseURL := env("BRIDGE_BASE_URL", "http://10.41.61.41")
 	channelCode := mustEnv("CHANNEL_CODE")
 	channelKey := mustEnv("CHANNEL_KEY")
 	encKey := mustEnv("DATA_ENCRYPTION_KEY")

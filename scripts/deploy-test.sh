@@ -73,11 +73,6 @@ ssh "$DEPLOY_HOST" "cd ${DEPLOY_DIR} && \
   else \
     echo 'BRIDGE_IMAGE=${BRIDGE_IMAGE}' >> .env; \
   fi && \
-  if grep -q '^APP_PORT=' .env 2>/dev/null; then \
-    sed -i 's#^APP_PORT=.*#APP_PORT=5051#' .env; \
-  else \
-    echo 'APP_PORT=5051' >> .env; \
-  fi && \
   if grep -q '^REDIS_IMAGE=' .env 2>/dev/null; then \
     sed -i 's#^REDIS_IMAGE=.*#REDIS_IMAGE=${REDIS_IMAGE}#' .env; \
   else \
@@ -105,9 +100,9 @@ ssh "$DEPLOY_HOST" "cd ${DEPLOY_DIR} && \
 
 # 8. 健康检查
 info "健康检查 ..."
-ssh "$DEPLOY_HOST" "APP_PORT=\$(grep -E '^APP_PORT=' ${DEPLOY_DIR}/.env 2>/dev/null | cut -d= -f2- | tr -d '\r'); APP_PORT=\${APP_PORT:-5051}; curl -sf http://127.0.0.1:\${APP_PORT}/health/ready >/dev/null && echo ready OK" \
+ssh "$DEPLOY_HOST" "curl -sf http://127.0.0.1/health/ready >/dev/null && echo ready OK" \
   || die "健康检查失败: ssh ${DEPLOY_HOST} 'cd ${DEPLOY_DIR} && docker compose logs bridge nginx'"
 
 info "部署完成"
-info "  管理后台: http://10.41.61.41:5051/ （自动进入 /admin/）"
-info "  健康检查: http://10.41.61.41:5051/health/ready"
+info "  管理后台: http://10.41.61.41/ （自动进入 /admin/）"
+info "  健康检查: http://10.41.61.41/health/ready"
