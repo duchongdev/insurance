@@ -11,3 +11,4 @@ config/config.yaml
 .vscode/
 story/
 deploy/admin-dist/
+deploy/nginx/conf.d/bridge-ssl.conf

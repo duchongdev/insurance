@@ -48,8 +48,22 @@ else
   COMPOSE="docker-compose"
 fi
 
-APP_PORT="$(read_env APP_PORT)"
-APP_PORT="${APP_PORT:-5051}"
+configure_nginx() {
+  local ssl_dir="$ROOT/deploy/ssl"
+  local conf_dir="$ROOT/deploy/nginx/conf.d"
+  if [[ -f "$ssl_dir/fullchain.pem" && -f "$ssl_dir/privkey.pem" ]]; then
+    cp "$conf_dir/bridge-ssl.conf.example" "$conf_dir/bridge-ssl.conf"
+    cp "$conf_dir/bridge-http-redirect.conf.example" "$conf_dir/bridge.conf"
+    echo "[start] 已启用 HTTPS :443（证书 deploy/ssl/）"
+  else
+    rm -f "$conf_dir/bridge-ssl.conf"
+    cp "$conf_dir/bridge-http-serve.conf.example" "$conf_dir/bridge.conf"
+    echo "[start] 未配置 SSL 证书，仅 HTTP :80（投产请将 fullchain.pem / privkey.pem 放入 deploy/ssl/）"
+  fi
+}
+
+configure_nginx
+
 BRIDGE_IMAGE="$(read_env BRIDGE_IMAGE)"
 NGINX_IMAGE="$(read_env NGINX_IMAGE)"
 NGINX_IMAGE="${NGINX_IMAGE:-nginx:1.26-alpine}"
@@ -73,7 +87,12 @@ fi
 
 echo
 echo "[start] 启动完成"
-echo "  管理后台: http://<服务器IP>:${APP_PORT}/"
-echo "  健康检查: http://<服务器IP>:${APP_PORT}/health/ready"
+if [[ -f deploy/ssl/fullchain.pem && -f deploy/ssl/privkey.pem ]]; then
+  echo "  管理后台: https://<域名或IP>/"
+  echo "  健康检查: https://<域名或IP>/health/ready"
+else
+  echo "  管理后台: http://<服务器IP>/"
+  echo "  健康检查: http://<服务器IP>/health/ready"
+fi
 echo "  查看日志: $COMPOSE logs -f nginx bridge"
 echo "  停止服务: ./scripts/stop.sh"
