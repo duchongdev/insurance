@@ -75,7 +75,7 @@ cd /home/ins
 ```bash
 ssh root@10.41.61.41 'cd /home/ins && docker compose ps'
 ssh root@10.41.61.41 'cd /home/ins && docker compose logs --tail=50 bridge'
-ssh root@10.41.61.41 'curl -v http://127.0.0.1:5051/health/ready'
+ssh root@10.41.61.41 'curl -v http://127.0.0.1/health/ready'
 ```
 
 ## 环境变量（可选覆盖）

@@ -349,7 +349,7 @@ ssh root@10.41.61.41 'cd /home/ins && ./scripts/stop.sh'
 3. 上传压缩包至 `/home/ins/`，保留服务器 `.env` 与 `config/config.yaml`
 4. 解压、合并配置
 5. 启动：`cd /home/ins && ./scripts/start.sh`
-6. 验证：`curl http://127.0.0.1:5051/health/ready`
+6. 验证：`curl http://127.0.0.1/health/ready`
 
 快捷命令：`make deploy-test`（见 `scripts/deploy-test.sh`）。
 
@@ -358,7 +358,7 @@ ssh root@10.41.61.41 'cd /home/ins && ./scripts/stop.sh'
 完成功能实现、bug 修复或管理后台/接口改造后，**同一任务内**执行 `make deploy-test`，并确认：
 
 - 健康检查 `ready OK`
-- 管理后台可访问：`http://10.41.61.41:5051/admin/`
+- 管理后台可访问：`http://10.41.61.41/admin/`
 
 **可跳过部署**：仅改文档/注释且无运行时影响；用户明确说「先不要部署」。
 
@@ -425,10 +425,10 @@ cp config/config.yaml.example config/config.yaml
 ./scripts/start.sh
 ```
 
-- 渠道 API：`http://localhost:5051/upChannelApi/...`
-- 管理后台：`http://localhost:5051/`（Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发）
+- 渠道 API：`http://localhost/upChannelApi/...`（或配置 SSL 后 `https://localhost/...`）
+- 管理后台：`http://localhost/`（Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发）
 - 默认管理员：见 `config/config.yaml` 中 `admin` 段（首次启动自动创建）
-- OpenAPI：`http://localhost:5051/openapi.yaml`
+- OpenAPI：`http://localhost/openapi.yaml`
 
 ## 配置
 

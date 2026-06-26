@@ -126,7 +126,7 @@ Content-Type: application/json; charset=utf-8
 # 1. 启动本服务（见 docs/TESTING.md §4）
 # 2. 管理后台创建渠道，获得 channelCode、channelKey
 # 3. 按 CHANNEL_API.md 计算 sign 后 POST
-curl -sS -X POST 'http://localhost:5051/upChannelApi/getBankList' \
+curl -sS -X POST 'http://localhost/upChannelApi/getBankList' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d '{"timestamp":"1717300000000","channelCode":"YOUR_CHANNEL_CODE","key":"***","sign":"***"}'
 ```

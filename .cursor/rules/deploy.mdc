@@ -42,13 +42,13 @@ cd /home/ins
 3. 上传压缩包至 `/home/ins/`（或临时目录后解压覆盖，保留 `.env` 与 `config/config.yaml`）
 4. 解压、必要时合并配置
 5. 启动：`cd /home/ins && ./scripts/start.sh`
-6. 验证：`curl http://127.0.0.1:5051/health/ready`
+6. 验证：`curl http://127.0.0.1/health/ready`
 
 ## 改造完成后自动部署（默认）
 
 - 在本仓库完成**功能实现、bug 修复或管理后台/接口改造**后，Agent **应主动**执行测试环境部署，无需用户再次说「部署」。
 - 执行方式：读取 skill **deploy-test**，运行 `make deploy-test`（即 `scripts/deploy-test.sh`）。
-- 部署结束向用户汇报：成功/失败、健康检查 `ready OK`、管理后台地址 `http://10.41.61.41:5051/admin/`。
+- 部署结束向用户汇报：成功/失败、健康检查 `ready OK`、管理后台地址 `http://10.41.61.41/admin/`。
 - **例外**（可跳过部署）：仅改文档/注释且无运行时影响；用户明确说「先不要部署」；纯本地探索未改可交付代码。
 
 ## 注意

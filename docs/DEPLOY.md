@@ -11,7 +11,7 @@
 | Docker Compose | v2（`docker compose`）或 v1（`docker-compose`） |
 | Node.js | 18+（构建管理后台前端；`scripts/start.sh` 会自动调用 `scripts/build-admin.sh`） |
 | 网络 | 首次构建需访问外网拉取基础镜像与 Go 依赖 |
-| 端口 | 默认占用 **5051**（Nginx 反向代理，可在 `.env` 修改 `APP_PORT`） |
+| 端口 | 默认 **80**（HTTP）、**443**（HTTPS，需配置 `deploy/ssl/` 证书） |
 
 验证 Docker：
 
@@ -61,7 +61,8 @@ chmod +x scripts/*.sh
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | **32 字节**加密密钥 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT 密钥 |
 | `BRIDGE_ADMIN_DEFAULT_PASSWORD` | 首次创建的管理员密码 |
-| `APP_PORT` | Nginx 对外端口，默认 5051 |
+
+HTTPS 证书（投产）：将 Nginx 格式证书放入 `deploy/ssl/fullchain.pem` 与 `deploy/ssl/privkey.pem`，`start.sh` 自动启用 443 并将 80 跳转至 HTTPS。
 
 编辑 **`config/config.yaml`**（可与 `.env` 保持一致，尤其 `huaan.base_url`、`security` 段）。
 
@@ -86,6 +87,26 @@ bash scripts/build-admin.sh
 ./scripts/start.sh
 ```
 
+## HTTPS（投产）
+
+1. 在阿里云申请免费 DV 证书，下载 **Nginx** 格式。
+2. 上传到服务器项目目录：
+
+```text
+deploy/ssl/fullchain.pem   # 证书链
+deploy/ssl/privkey.pem     # 私钥
+chmod 600 deploy/ssl/privkey.pem
+```
+
+3. 重新启动：`./scripts/start.sh`  
+   脚本检测到证书后会自动：
+   - 启用 Nginx **443**（HTTPS）
+   - **80** 自动 301 跳转至 HTTPS
+
+4. 安全组放行 **443**、**80**（跳转用）；**不要**再开放旧端口 5051。
+
+无证书时默认仅 **HTTP :80**，便于联调；投产前务必配置证书。
+
 ## 验证
 
 ```bash
@@ -93,8 +114,8 @@ bash scripts/build-admin.sh
 docker compose ps
 
 # 健康检查
-curl http://127.0.0.1:5051/health/live
-curl http://127.0.0.1:5051/health/ready
+curl http://127.0.0.1/health/live
+curl http://127.0.0.1/health/ready
 
 # 应用日志
 docker compose logs -f bridge
@@ -105,8 +126,8 @@ docker compose logs -f nginx
 
 浏览器访问：
 
-- 管理后台：`http://<服务器IP>:5051/`（根路径自动跳转 `/admin/`）
-- API 文档：`http://<服务器IP>:5051/openapi.yaml`
+- 管理后台：`http://<服务器IP>/` 或 `https://<域名>/`（配置 SSL 后）
+- API 文档：`http://<服务器IP>/openapi.yaml`
 
 默认管理员用户名见 `config/config.yaml` 中 `admin.default_username`（默认 `admin`），密码为你在 `.env` 中配置的 `BRIDGE_ADMIN_DEFAULT_PASSWORD`。**首次登录后请修改密码。**
 
@@ -133,7 +154,8 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 ## 安全建议
 
 - 不要将 `.env` 或含真实密钥的 `config/config.yaml` 外传或提交到 Git
-- 生产环境在防火墙仅开放 `APP_PORT`（Nginx）；应用与数据库默认不映射到宿主机端口
+- 生产环境在防火墙仅开放 **80、443**；SSH 仅放行运维 IP；应用与数据库默认不映射到宿主机端口
+- 证书：阿里云免费 DV 证书下载 Nginx 格式，重命名为 `fullchain.pem` / `privkey.pem` 放入 `deploy/ssl/`
 - 可在 `deploy/nginx/conf.d/bridge.conf` 中调整反向代理参数；生产环境建议在 Nginx 前或之上配置 HTTPS
 - 定期备份 Docker 卷 `mysql_data` 或导出 MySQL 数据
 
@@ -144,7 +166,7 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 | `请在 .env 中设置 MYSQL_ROOT_PASSWORD` | 未创建或未编辑 `.env`，执行 `./scripts/install.sh` |
 | `ready` 探针失败 | 数据库或 Redis 未就绪，执行 `docker compose logs mysql` / `docker compose logs redis` |
 | 构建失败 / 无法拉镜像 | 检查服务器网络与 Docker 镜像源 |
-| 5051 无法访问 | 检查防火墙、`APP_PORT`、Nginx 与 bridge 容器是否运行 |
+| 80/443 无法访问 | 检查安全组（80、443）、Nginx 与 bridge 容器是否运行；HTTPS 需确认 `deploy/ssl/` 证书 |
 
 ## 目录说明
 
@@ -157,7 +179,10 @@ docker compose down -v         # 停止并删除数据卷（清空数据库与 R
 │   ├── DEPLOY.md             # 本文件
 │   └── CHANNEL_API.md
 ├── docker-compose.yml        # 编排 MySQL + Redis + 应用 + Nginx
-├── deploy/nginx/             # Nginx 反向代理配置
+├── deploy/nginx/             # Nginx 反向代理（80/443）
+│   ├── conf.d/               # HTTP 配置；有证书时自动生成 bridge-ssl.conf
+│   └── snippets/             # 共用 location 片段
+├── deploy/ssl/               # HTTPS 证书目录（不提交 Git）
 ├── Dockerfile                # 应用镜像构建
 ├── .env.example              # 环境变量模板
 ├── config/

@@ -183,7 +183,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_Get
 ### 4.3 构造请求
 
 ```http
-POST http://localhost:5051/upChannelApi/getBankList
+POST http://localhost/upChannelApi/getBankList
 Content-Type: application/json; charset=utf-8
 ```
 
@@ -255,7 +255,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 渠道全流程（验签 + PII 加解密）：
 
 ```bash
-# 见 scripts/channel_sim/main.go，或 POST http://localhost:5051/upChannelApi/product/info
+# 见 scripts/channel_sim/main.go，或 POST http://localhost/upChannelApi/product/info
 ```
 
 ### 7.2 单接口复现命令（sms/send）
