@@ -3,6 +3,7 @@ package huaan
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,12 +44,16 @@ func LoadEnvTestConfig(t *testing.T) EnvTestConfig {
 
 // ToAppConfig 转为应用 Config，供 huaan.Client 使用。
 func (e EnvTestConfig) ToAppConfig() *config.Config {
+	signEnabled := false
+	if v := os.Getenv("HUAAN_SIGN_ENABLED"); v != "" {
+		signEnabled = v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+	}
 	return &config.Config{
 		HuaAn: config.HuaAnConfig{
 			BaseURL:     e.BaseURL,
 			APIPath:     e.APIPath,
 			Key:         e.HuaAnKey,
-			SignEnabled: false,
+			SignEnabled: signEnabled,
 		},
 		Server: config.ServerConfig{UpstreamTimeout: 30 * time.Second},
 	}
@@ -61,7 +66,7 @@ func NewTestClient(t *testing.T) (*Client, EnvTestConfig) {
 	return NewClient(env.ToAppConfig(), nil, nil), env
 }
 
-// LogRequest 输出即将发往华安的请求体（Call 注入 key/sign 之前的状态；含已组装的业务字段）。
+// LogRequest 输出即将发往华安的请求体（Call 注入 sign 请求头或空 key/sign 之前的状态）。
 func LogRequest(t *testing.T, apiPath string, body map[string]interface{}) {
 	t.Helper()
 	t.Logf("=== 请求 %s ===", apiPath)

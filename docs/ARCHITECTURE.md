@@ -106,14 +106,10 @@ flowchart LR
 // internal/huaan/paths.go
 var APIPaths = []string{
     ProInsurancePath,             // 上游 /proxy/upChannelApi/proInsurance
-    "/upGradeIns",
     "/getSignUrl",
-    "/verifyNoCode",
-    "/getPolicyInfoByPhoneNo",
     "/getProductPricesByProductCode",
     BankListPath,                     // 上游 /common/channel/api/getBankList
-    "/getProductInfoByChannel",
-    "/product/info",              // 上游 /common/channel/api/product/info
+    ProductInfoPath,                  // 上游 /common/channel/api/product/info（getProductInfoByChannel 已废弃）
     "/sms/send",                  // 上游 /common/channel/api/sms/send
     "/sms/valid",                 // 上游 /common/channel/api/sms/valid
     "/sms/noValid",               // 上游 /common/channel/api/sms/noValid
@@ -123,6 +119,7 @@ var APIPaths = []string{
     "/getLiabilitiesByProductId", // 上游 /common/channel/api/getLiabilitiesByProductId
     ProductPricesByPolicyIDPath,    // 上游 /common/channel/api/getProductPricesByPolicyId
     PolicyInfoByPolicyIDPath,       // 上游 /common/channel/api/getPolicyInfoByPolicyId
+    GetPhoneByTokenPath,            // 上游 /common/channel/api/getPhoneByToken
 }
 ```
 

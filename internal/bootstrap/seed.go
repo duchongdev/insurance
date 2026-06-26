@@ -2,32 +2,43 @@
 package bootstrap
 
 import (
-	"github.com/huaan/insurance-bridge/internal/config"
+	"errors"
+
 	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/repository"
 	"github.com/huaan/insurance-bridge/internal/service"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-// Seed 当 admin_users 表为空时，使用配置中的默认用户名/密码创建首个管理员（bcrypt 哈希存储）。
-// 生产环境部署后应立即登录并修改密码。
-func Seed(cfg *config.Config, adminRepo *repository.AdminRepo, log *zap.Logger) error {
-	n, err := adminRepo.Count()
+// Seed 确保内置管理员账号存在且密码与 DefaultAdminPassword 一致（bcrypt 哈希存储）。
+func Seed(adminRepo *repository.AdminRepo, log *zap.Logger) error {
+	hash, err := service.HashPassword(DefaultAdminPassword)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		hash, err := service.HashPassword(cfg.Admin.DefaultPassword)
-		if err != nil {
+
+	u, err := adminRepo.GetByUsername(DefaultAdminUsername)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := adminRepo.Create(&model.AdminUser{
+				Username:     DefaultAdminUsername,
+				PasswordHash: hash,
+			}); err != nil {
+				return err
+			}
+			log.Info("default admin user created", zap.String("username", DefaultAdminUsername))
+			return nil
+		}
+		return err
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(DefaultAdminPassword)) != nil {
+		if err := adminRepo.UpdatePasswordHash(u.ID, hash); err != nil {
 			return err
 		}
-		if err := adminRepo.Create(&model.AdminUser{
-			Username:     cfg.Admin.DefaultUsername,
-			PasswordHash: hash,
-		}); err != nil {
-			return err
-		}
-		log.Info("default admin user created", zap.String("username", cfg.Admin.DefaultUsername))
+		log.Info("built-in admin password synced", zap.String("username", DefaultAdminUsername))
 	}
 	return nil
 }

@@ -69,7 +69,31 @@ func (t *Transformer) EncryptResponse(body map[string]interface{}) error {
 			}
 		}
 	}
+	encryptStringDataPhone(body, t.c)
 	return nil
+}
+
+// encryptStringDataPhone 当 data 为手机号明文字符串时加密（如 getPhoneByToken）。
+func encryptStringDataPhone(root map[string]interface{}, c *cipher.AES256GCM) {
+	s, ok := root["data"].(string)
+	if !ok || s == "" || !looksLikeMobile(s) {
+		return
+	}
+	if enc, err := c.Encrypt(s); err == nil {
+		root["data"] = enc
+	}
+}
+
+func looksLikeMobile(s string) bool {
+	if len(s) != 11 || s[0] != '1' {
+		return false
+	}
+	for i := 1; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // encryptMapFields 当 root[key] 为 map 时，对其执行 PII 加密。

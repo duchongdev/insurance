@@ -61,7 +61,6 @@ async function onSubmit() {
             登录
           </el-button>
         </el-form>
-        <p class="login-hint">首次部署账号见 config/config.yaml 中 admin 段（仅表为空时自动创建）。</p>
       </div>
     </div>
   </div>
@@ -132,13 +131,6 @@ async function onSubmit() {
 .login-btn {
   width: 100%;
   margin-top: 8px;
-}
-
-.login-hint {
-  margin: 16px 0 0;
-  font-size: 12px;
-  color: var(--color-text-muted);
-  line-height: 1.6;
 }
 
 .login-card :deep(.el-form-item__label) {

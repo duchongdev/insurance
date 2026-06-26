@@ -23,11 +23,13 @@ request.interceptors.response.use(
     const message = error.response?.data?.message || error.message || '请求失败'
 
     if (status === 401) {
-      clearToken()
-      if (router.currentRoute.value.path !== '/login') {
-        ElMessage.error('登录已过期，请重新登录')
-        router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
+      if (router.currentRoute.value.path === '/login') {
+        ElMessage.error('账号或密码错误')
+        return Promise.reject(error)
       }
+      clearToken()
+      ElMessage.error('登录已过期，请重新登录')
+      router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
       return Promise.reject(error)
     }
 

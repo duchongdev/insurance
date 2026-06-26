@@ -59,7 +59,6 @@ func main() {
 
 	cases := []caseDef{
 		{name: "getBankList", path: huaan.BankListPath},
-		{name: "getProductInfoByChannel", path: "/getProductInfoByChannel"},
 		{name: "productInfo", path: huaan.ProductInfoPath, needPII: true},
 		{name: "smsSend", path: huaan.SmsSendPath, needPII: true},
 		{name: "smsValid", path: huaan.SmsValidPath, needMobile: true, fields: map[string]interface{}{"smsCode": smsCode}},
@@ -75,15 +74,12 @@ func main() {
 		{name: "getProductPricesByProductCode", path: "/getProductPricesByProductCode", needPII: true, fields: map[string]interface{}{
 			"productCode": productCode, "hasSocialSecurity": "1",
 		}},
-		{name: "verifyNoCode", path: "/verifyNoCode", needPII: true},
 		{name: "proInsurance", path: huaan.ProInsurancePath, needPII: true, fields: map[string]interface{}{
 			"productCode": productCode, "hasSocialSecurity": 1, "isUpgrade": 0, "autoRenew": 1,
 		}},
-		{name: "upGradeIns", path: "/upGradeIns", fields: map[string]interface{}{"policyId": policyID}},
 		{name: "getSignUrl", path: "/getSignUrl", needPII: true, fields: map[string]interface{}{
 			"policyId": policyID, "bankCode": "BOC", "cardType": "1", "userId": userID,
 		}},
-		{name: "getPolicyInfoByPhoneNo", path: "/getPolicyInfoByPhoneNo", needPII: true},
 		{name: "getProductPricesByPolicyId", path: huaan.ProductPricesByPolicyIDPath, fields: map[string]interface{}{
 			"policyId": policyID,
 		}},
@@ -163,13 +159,9 @@ func main() {
 						policyID = pid
 						fmt.Printf("\n(已从 proInsurance 响应更新 policyId=%s)\n", policyID)
 					}
-				}
-			}
-			if tc.name == "verifyNoCode" && env("TEST_USER_ID", "") == "" {
-				if data, ok := m["data"].(map[string]interface{}); ok {
-					if uid, ok := data["userId"].(string); ok && uid != "" {
+					if uid, ok := data["userId"].(string); ok && uid != "" && env("TEST_USER_ID", "") == "" {
 						userID = uid
-						fmt.Printf("\n(已从 verifyNoCode 响应更新 userId=%s)\n", userID)
+						fmt.Printf("\n(已从 proInsurance 响应更新 userId=%s)\n", userID)
 					}
 				}
 			}

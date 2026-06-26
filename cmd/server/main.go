@@ -71,16 +71,21 @@ func main() {
 	channelRepo := repository.NewChannelRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
 	bankRepo := repository.NewBankRepo(db)
+	huaAnSettingRepo := repository.NewHuaAnSettingRepo(db)
 
-	if err := bootstrap.Seed(cfg, adminRepo, log); err != nil {
+	if err := bootstrap.Seed(adminRepo, log); err != nil {
 		log.Fatal("seed failed", zap.Error(err))
+	}
+	if err := bootstrap.SyncHuaAnSetting(cfg, huaAnSettingRepo, log); err != nil {
+		log.Fatal("huaan settings sync failed", zap.Error(err))
 	}
 
 	// --- 业务服务 ---
 	piiTransformer := pii.NewTransformer(crypter)
 	bankListCache := redisclient.NewBankListCache(rdb, cfg.Redis.BankListTTL)
-	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, piiTransformer, bankListCache, nil)
+	proxySvc := service.NewProxyService(cfg, log, channelRepo, bankRepo, huaAnSettingRepo, piiTransformer, bankListCache, nil)
 	adminSvc := service.NewAdminService(adminRepo, channelRepo, bankRepo, cfg.Security.JWTSecret)
+	huaAnConfSvc := service.NewHuaAnConfigService(cfg, huaAnSettingRepo)
 
 	// --- HTTP 路由 ---
 	gin.SetMode(cfg.Server.Mode)
@@ -98,7 +103,7 @@ func main() {
 	callbackHandler := handler.NewCallbackHandler(proxySvc)
 	callbackHandler.Register(r)
 
-	adminHandler := handler.NewAdminHandler(adminSvc, proxySvc)
+	adminHandler := handler.NewAdminHandler(adminSvc, proxySvc, huaAnConfSvc)
 	adminHandler.Register(r.Group("/admin/api"))
 
 	r.GET("/", func(c *gin.Context) {

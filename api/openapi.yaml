@@ -4,7 +4,7 @@ info:
   description: |
     渠道商调用本服务，本服务验签、解密三要素后转发华安，并将华安响应原样返回（三要素字段加密）。
     管理后台 API 需 Bearer Token。
-  version: 1.14.0
+  version: 1.15.0
 servers:
   - url: http://localhost
   - url: https://localhost
@@ -102,11 +102,13 @@ paths:
                 $ref: '#/components/schemas/ApiResponse'
   /upChannelApi/upGradeIns:
     post:
+      deprecated: true
       tags: [渠道接口]
-      summary: 保单升级
+      summary: 保单升级（已废弃）
+      description: 已废弃，本服务不再注册该路由。
       responses:
-        '200':
-          description: ok
+        '410':
+          description: 接口已废弃
   /upChannelApi/getSignUrl:
     post:
       tags: [渠道接口]
@@ -116,18 +118,22 @@ paths:
           description: ok
   /upChannelApi/verifyNoCode:
     post:
+      deprecated: true
       tags: [渠道接口]
-      summary: 用户注册
+      summary: 用户注册（已废弃）
+      description: 已废弃，本服务不再注册该路由。
       responses:
-        '200':
-          description: ok
+        '410':
+          description: 接口已废弃
   /upChannelApi/getPolicyInfoByPhoneNo:
     post:
+      deprecated: true
       tags: [渠道接口]
-      summary: 查询用户保单
+      summary: 查询用户保单（已废弃）
+      description: 已废弃，本服务不再注册该路由。
       responses:
-        '200':
-          description: ok
+        '410':
+          description: 接口已废弃
   /upChannelApi/getProductPricesByProductCode:
     post:
       tags: [渠道接口]
@@ -164,11 +170,15 @@ paths:
                           $ref: '#/components/schemas/BankListItem'
   /upChannelApi/getProductInfoByChannel:
     post:
+      deprecated: true
       tags: [渠道接口]
-      summary: 渠道查询产品
+      summary: 渠道查询产品（已废弃）
+      description: |
+        **已废弃**：华安侧不再使用该接口，请改用 `/upChannelApi/product/info` 获取 productCode。
+        本服务不再注册该路由。
       responses:
-        '200':
-          description: ok
+        '410':
+          description: 接口已废弃
   /upChannelApi/product/info:
     post:
       tags: [渠道接口]
@@ -223,7 +233,9 @@ paths:
     post:
       tags: [渠道接口]
       summary: 短信验证码校验
-      description: 校验手机号与短信验证码；转发华安 /common/channel/api/sms/valid
+      description: |
+        校验手机号与短信验证码；转发华安 /common/channel/api/sms/valid。
+        **联调状态：未完成联调**（华安验签规则待确认，见 docs/TESTING.md §7）。
       requestBody:
         required: true
         content:
@@ -376,6 +388,43 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/UserInfoData'
+  /upChannelApi/getPhoneByToken:
+    post:
+      tags: [渠道接口]
+      summary: 一键登录解密手机号
+      description: |
+        一键登录后凭 token 与 userInformation 解密获取用户手机号；
+        转发华安 POST /common/channel/api/getPhoneByToken。
+        响应 `data` 为手机号字符串，返回渠道时须加密。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/SignedRequest'
+                - type: object
+                  required: [userInformation, token]
+                  properties:
+                    userInformation:
+                      type: string
+                      description: 一键登录返回的用户信息
+                    token:
+                      type: string
+                      description: 一键登录返回的 token
+      responses:
+        '200':
+          description: 华安标准响应，data 为用户手机号
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: string
+                        description: 用户手机号（返回渠道时须加密）
   /upChannelApi/getLiabilitiesByProductId:
     post:
       tags: [渠道接口]
@@ -498,13 +547,32 @@ paths:
     post:
       tags: [管理后台]
       security: [{ bearerAuth: [] }]
-      summary: 创建渠道
+      summary: 创建渠道（渠道编码来自华安配置）
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ChannelInput'
+  /admin/api/channels/{id}:
+    put:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 更新渠道
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelUpdateInput'
+      responses:
+        '200':
+          description: 更新后的渠道
   /admin/api/banks:
     get:
       tags: [管理后台]
@@ -563,13 +631,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [channelCode]
+              required: [huaanSettingId]
               properties:
-                channelCode: { type: string, description: 渠道编码 }
-                huaAnKey:
-                  type: string
-                  deprecated: true
-                  description: 已废弃；上游 key 由服务端 config huaan.key 配置
+                huaanSettingId:
+                  type: integer
+                  description: 所选华安配置 ID，用于请求 getBankList
       responses:
         '200':
           description: 华安 getBankList 原始响应
@@ -579,6 +645,92 @@ paths:
                 $ref: '#/components/schemas/ApiResponse'
         '502':
           description: 华安不可达或超时
+  /admin/api/huaan-configs:
+    get:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 列出全部华安上游配置
+      responses:
+        '200':
+          description: 配置列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  list:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HuaAnConfig'
+    post:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 新建华安上游配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HuaAnConfigInput'
+      responses:
+        '200':
+          description: 新建的配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuaAnConfig'
+  /admin/api/huaan-configs/{id}:
+    put:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 更新华安上游配置
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HuaAnConfigInput'
+      responses:
+        '200':
+          description: 更新后的配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuaAnConfig'
+    delete:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 删除华安上游配置
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 已删除
+  /admin/api/huaan-configs/{id}/test:
+    post:
+      tags: [管理后台]
+      security: [{ bearerAuth: [] }]
+      summary: 探测指定配置的接口根地址网络连通性（HTTP HEAD/GET）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 连通性探测结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HuaAnConnectivityResult'
 components:
   securitySchemes:
     bearerAuth:
@@ -692,19 +844,87 @@ components:
         name: { type: string, description: 姓名（响应须加密） }
         phoneNo: { type: string, description: 手机号（响应须加密） }
         channelCode: { type: string }
+    HuaAnConfig:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string, description: 配置名称（可选） }
+        envType:
+          type: string
+          enum: [prod, test]
+          description: 环境类型，prod=生产 test=测试
+        baseUrl:
+          type: string
+          description: 华安上游接口根地址
+        channelCode:
+          type: string
+          description: 华安侧渠道编码
+        channelSecret:
+          type: string
+          description: 华安侧密钥（请求体 key 字段）
+        isActive:
+          type: boolean
+          description: 历史字段，已不再用于切换当前配置
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    HuaAnConfigInput:
+      type: object
+      required: [envType, baseUrl, channelCode]
+      properties:
+        name: { type: string }
+        envType:
+          type: string
+          enum: [prod, test]
+        baseUrl:
+          type: string
+          description: 华安上游接口根地址
+        channelCode:
+          type: string
+          description: 华安侧渠道编码
+        channelSecret:
+          type: string
+          description: 新建时必填；更新时留空则保留原值
+    HuaAnConnectivityResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          description: 是否成功收到上游 HTTP 响应
+        durationMs:
+          type: integer
+          format: int64
+          description: 请求耗时（毫秒）
+        upstreamUrl:
+          type: string
+          description: 实际探测的 URL（接口根地址）
+        httpStatus:
+          type: integer
+          description: 上游返回的 HTTP 状态码
+        message:
+          type: string
+          description: 可读结果说明
     ChannelInput:
       type: object
-      required: [channelCode, huaAnKey, callbackUrl]
+      required: [huaanSettingId, callbackUrl]
       properties:
-        channelCode: { type: string }
+        huaanSettingId:
+          type: integer
+          description: 关联的华安配置 ID，渠道编码与华安密钥由此同步
         channelName: { type: string }
         channelKey: { type: string, description: 留空则服务端自动生成 }
-        huaAnKey: { type: string }
         callbackUrl:
           type: string
-          description: 投保结果回调地址（本服务转发华安 notify 时使用），须 http(s) URL
+          description: 投保结果回调地址，须 http(s) URL
         status: { type: integer, description: '1=启用 0=禁用', default: 1 }
-        remark: { type: string }
+    ChannelUpdateInput:
+      type: object
+      properties:
+        channelName: { type: string }
+        channelKey: { type: string, description: 留空则保留原值 }
+        callbackUrl:
+          type: string
+          description: 投保结果回调地址
+        status: { type: integer, description: '1=启用 0=禁用' }
     InsureNotifyRequest:
       type: object
       required:

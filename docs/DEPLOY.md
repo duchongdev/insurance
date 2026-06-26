@@ -2,6 +2,8 @@
 
 本文档面向**收到压缩包后在服务器上部署**的使用方。无需安装 Go，仅需 Docker 与 Docker Compose。
 
+**部署到阿里云**（资源采购、安全组、SSH、域名、IP 白名单）见 **[ALIYUN.md](./ALIYUN.md)**。
+
 ## 环境要求
 
 | 项目 | 要求 |
@@ -60,7 +62,6 @@ chmod +x scripts/*.sh
 | `BRIDGE_HUAAN_BASE_URL` | 华安上游域名 |
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | **32 字节**加密密钥 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT 密钥 |
-| `BRIDGE_ADMIN_DEFAULT_PASSWORD` | 首次创建的管理员密码 |
 
 HTTPS 证书（投产）：将 Nginx 格式证书放入 `deploy/ssl/fullchain.pem` 与 `deploy/ssl/privkey.pem`，`start.sh` 自动启用 443 并将 80 跳转至 HTTPS。
 
@@ -129,7 +130,7 @@ docker compose logs -f nginx
 - 管理后台：`http://<服务器IP>/` 或 `https://<域名>/`（配置 SSL 后）
 - API 文档：`http://<服务器IP>/openapi.yaml`
 
-默认管理员用户名见 `config/config.yaml` 中 `admin.default_username`（默认 `admin`），密码为你在 `.env` 中配置的 `BRIDGE_ADMIN_DEFAULT_PASSWORD`。**首次登录后请修改密码。**
+内置管理员账号：**admin** / **Admin123!@#**（登录页已预填，首次启动自动写入数据库）。
 
 ## 常用运维命令
 
@@ -265,6 +266,7 @@ docker run --rm hello-world
 
 ## 相关文档
 
+- [ALIYUN.md](./ALIYUN.md) — 阿里云上云（安全组、SSH、域名、白名单）
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — 系统架构
 - [TESTING.md](./TESTING.md) — 测试与华安直连
 - [CHANNEL_API.md](./CHANNEL_API.md) — 渠道商接口文档

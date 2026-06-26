@@ -12,6 +12,7 @@ func TestAPIPathsContainsCommonChannelAPIs(t *testing.T) {
 		PolicyByPhonePath,
 		UserInfoByPhoneNoPath,
 		LiabilitiesByProductIDPath,
+		GetPhoneByTokenPath,
 	}
 	for _, path := range want {
 		found := false

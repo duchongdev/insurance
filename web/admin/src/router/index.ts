@@ -16,6 +16,7 @@ const router = createRouter({
       children: [
         { path: '', redirect: '/dashboard' },
         { path: 'dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue'), meta: { title: '概览' } },
+        { path: 'huaan-config', name: 'huaan-config', component: () => import('@/views/HuaAnConfigView.vue'), meta: { title: '华安配置' } },
         { path: 'channels', name: 'channels', component: () => import('@/views/ChannelsView.vue'), meta: { title: '渠道管理' } },
         { path: 'banks', name: 'banks', component: () => import('@/views/BanksView.vue'), meta: { title: '银行列表' } },
       ],

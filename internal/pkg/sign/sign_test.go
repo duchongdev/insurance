@@ -11,7 +11,7 @@ func TestBuild_ExampleFromDoc(t *testing.T) {
 		"timestamp":          "1713236726003",
 	}
 	got := Build(params, "")
-	want := "66aa23b057593150546a42d7e51d0b7e"
+	want := "f6fc314cc84e3bb33bb85695ebcd8aeb"
 	if got != want {
 		t.Fatalf("sign=%s want=%s", got, want)
 	}

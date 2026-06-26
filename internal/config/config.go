@@ -16,7 +16,7 @@ type Config struct {
 	Redis    RedisConfig    // Redis 连接
 	Security SecurityConfig // 加密与 JWT
 	Log      LogConfig      // 日志与清理策略
-	Admin    AdminConfig    // 默认管理员（仅首次 seed 使用）
+	Admin    AdminConfig    // 管理后台 CORS 等
 }
 
 // ServerConfig Gin/HTTP 服务监听与超时参数。
@@ -30,9 +30,10 @@ type ServerConfig struct {
 
 // HuaAnConfig 华安保险上游 API 根路径配置。
 type HuaAnConfig struct {
-	BaseURL     string // 上游域名，如 https://xx.xxx.api.york.xin
+	BaseURL     string // 上游域名，如 https://ins.api.hahealth.ink/
 	APIPath     string // 渠道 API 前缀，默认 /upChannelApi
-	Key         string // 请求体 key 字段，默认空字符串
+	ChannelCode string // 华安侧渠道编码，管理后台任务（如刷新银行列表）使用
+	Key         string // 华安侧密钥（请求体 key 字段），默认空字符串
 	SignEnabled bool   // true 时按规则生成 sign；false 时 sign 传空字符串
 }
 
@@ -64,11 +65,9 @@ type LogConfig struct {
 	MaxSizeMB      int    // 单文件大小上限（MB），达到后轮转（默认 100）
 }
 
-// AdminConfig 管理后台：默认账号（Seed）与开发期 CORS。
+// AdminConfig 管理后台相关配置。
 type AdminConfig struct {
-	DefaultUsername string
-	DefaultPassword string
-	CorsOrigins     []string // 非空时对匹配 Origin 启用 CORS（如 http://localhost:5173）
+	CorsOrigins []string // 非空时对匹配 Origin 启用 CORS（如 http://localhost:5173）
 }
 
 // Load 从指定路径加载配置；文件不存在时使用默认值，环境变量 BRIDGE_* 可覆盖任意项。
@@ -97,6 +96,7 @@ func Load(path string) (*Config, error) {
 		HuaAn: HuaAnConfig{
 			BaseURL:     v.GetString("huaan.base_url"),
 			APIPath:     v.GetString("huaan.api_path"),
+			ChannelCode: v.GetString("huaan.channel_code"),
 			Key:         v.GetString("huaan.key"),
 			SignEnabled: v.GetBool("huaan.sign_enabled"),
 		},
@@ -121,9 +121,7 @@ func Load(path string) (*Config, error) {
 			MaxSizeMB:      v.GetInt("log.max_size_mb"),
 		},
 		Admin: AdminConfig{
-			DefaultUsername: v.GetString("admin.default_username"),
-			DefaultPassword: v.GetString("admin.default_password"),
-			CorsOrigins:     parseStringList(v.GetString("admin.cors_origins")),
+			CorsOrigins: parseStringList(v.GetString("admin.cors_origins")),
 		},
 	}
 	return cfg, nil
@@ -138,6 +136,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("server.upstream_timeout", "25s")
 	v.SetDefault("huaan.base_url", "https://xx.xxx.api.york.xin")
 	v.SetDefault("huaan.api_path", "/upChannelApi")
+	v.SetDefault("huaan.channel_code", "")
 	v.SetDefault("huaan.key", "")
 	v.SetDefault("huaan.sign_enabled", false)
 	v.SetDefault("database.dsn", "bridge:bridge123@tcp(mysql:3306)/insurance_bridge?charset=utf8mb4&parseTime=True&loc=Local")
@@ -149,8 +148,6 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("log.retention_days", 90)
 	v.SetDefault("log.archive_enabled", true)
 	v.SetDefault("log.max_size_mb", 100)
-	v.SetDefault("admin.default_username", "admin")
-	v.SetDefault("admin.default_password", "admin123")
 }
 
 // parseStringList 解析逗号分隔的配置项为字符串切片。

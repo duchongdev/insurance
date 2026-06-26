@@ -191,8 +191,9 @@ flowchart TD
 | getSignUrl | 是 | 否 |
 | getProductPricesByPolicyId | 否 | 否 |
 | getPolicyInfoByPolicyId | 否 | 是（insuredList 等） |
+| getPhoneByToken | 否 | 是（data 为手机号字符串） |
 
-不涉及三要素的接口（如 `getBankList`、`getProductInfoByChannel`）不受开关实质影响。
+不涉及三要素的接口（如 `getBankList`）不受开关实质影响。
 
 ### 4.6 错误码（不变）
 

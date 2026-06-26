@@ -47,7 +47,8 @@ func ValidateChannelConfig(ch *model.Channel) error {
 }
 
 // HandleInsureNotify 接收华安投保结果回调，转发至渠道 callbackUrl 并返回华安约定 JSON。
-func (s *ProxyService) HandleInsureNotify(ctx context.Context, rawBody []byte) ([]byte, int, error) {
+// reqSign 为华安 HTTP 头 sign（sign_enabled 时校验）；空则跳过验签。
+func (s *ProxyService) HandleInsureNotify(ctx context.Context, rawBody []byte, reqSign string) ([]byte, int, error) {
 	traceID := uuid.New().String()
 	var body map[string]interface{}
 	if err := json.Unmarshal(rawBody, &body); err != nil {
@@ -71,12 +72,9 @@ func (s *ProxyService) HandleInsureNotify(ctx context.Context, rawBody []byte) (
 		return s.callbackError(500, "channel callbackUrl not configured"), http.StatusOK, nil
 	}
 
-	if s.cfg.HuaAn.SignEnabled {
-		if reqSign, _ := body["sign"].(string); reqSign != "" {
-			params := sign.MapFromJSON(body)
-			if !sign.Verify(params, s.cfg.HuaAn.Key) {
-				return s.callbackError(401, "sign verify failed"), http.StatusOK, nil
-			}
+	if s.cfg.HuaAn.SignEnabled && reqSign != "" {
+		if !sign.VerifyHuaAnHeader(sign.MapFromJSON(body), s.cfg.HuaAn.Key, reqSign) {
+			return s.callbackError(401, "sign verify failed"), http.StatusOK, nil
 		}
 	}
 

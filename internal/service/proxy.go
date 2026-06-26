@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/huaan/insurance-bridge/internal/config"
 	"github.com/huaan/insurance-bridge/internal/huaan"
+	"github.com/huaan/insurance-bridge/internal/model"
 	"github.com/huaan/insurance-bridge/internal/pkg/pii"
 	rediscache "github.com/huaan/insurance-bridge/internal/pkg/redis"
 	"github.com/huaan/insurance-bridge/internal/pkg/sign"
@@ -24,6 +25,7 @@ type ProxyService struct {
 	log           *zap.Logger
 	channels      *repository.ChannelRepo
 	banks         *repository.BankRepo
+	huaanSettings *repository.HuaAnSettingRepo
 	pii           *pii.Transformer
 	bankListCache *rediscache.BankListCache
 	huaan         *huaan.Client
@@ -35,6 +37,7 @@ func NewProxyService(
 	log *zap.Logger,
 	channels *repository.ChannelRepo,
 	banks *repository.BankRepo,
+	huaanSettings *repository.HuaAnSettingRepo,
 	piiTransformer *pii.Transformer,
 	bankListCache *rediscache.BankListCache,
 	huaanClient *huaan.Client,
@@ -47,6 +50,7 @@ func NewProxyService(
 		log:           log,
 		channels:      channels,
 		banks:         banks,
+		huaanSettings: huaanSettings,
 		pii:           piiTransformer,
 		bankListCache: bankListCache,
 		huaan:         huaanClient,
@@ -101,7 +105,7 @@ func (s *ProxyService) Forward(ctx context.Context, apiPath string, rawBody []by
 		return s.errorResponse(400, "pii decrypt failed"), http.StatusOK, nil
 	}
 
-	result, err := s.huaan.Call(ctx, apiPath, body)
+	result, err := s.callHuaAn(ctx, ch, apiPath, body)
 	if err != nil {
 		s.log.Warn("upstream failed",
 			zap.String("traceId", traceID),
@@ -141,14 +145,18 @@ func (s *ProxyService) GetCachedBankList(ctx context.Context, channelCode string
 	return s.bankListCache.Get(ctx, channelCode)
 }
 
-// RefreshBankList 管理后台手动请求华安 /getBankList；key/sign 由配置 huaan.key、huaan.sign_enabled 决定。
-func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode string) ([]byte, error) {
-	if channelCode == "" {
-		return nil, errors.New("channelCode required")
+// RefreshBankList 使用指定华安配置请求上游 getBankList。
+func (s *ProxyService) RefreshBankList(ctx context.Context, huaAnSettingID uint64) ([]byte, error) {
+	if huaAnSettingID == 0 {
+		return nil, errors.New("huaanSettingId required")
+	}
+	setting, err := s.huaanSettings.GetByID(huaAnSettingID)
+	if err != nil {
+		return nil, errors.New("huaan setting not found")
 	}
 
-	body := huaan.BuildRequestBody(channelCode, nil)
-	result, err := s.huaan.Call(ctx, huaan.BankListPath, body)
+	body := huaan.BuildRequestBody(setting.ChannelCode, nil)
+	result, err := s.callHuaAnWithSetting(ctx, setting, huaan.BankListPath, body)
 	if err != nil {
 		if errors.Is(err, huaan.ErrTimeout) {
 			return nil, errors.New("upstream timeout")
@@ -156,8 +164,31 @@ func (s *ProxyService) RefreshBankList(ctx context.Context, channelCode string) 
 		return nil, err
 	}
 
-	s.cacheBankList(ctx, channelCode, result.Body)
+	s.cacheBankList(ctx, setting.ChannelCode, result.Body)
 	return result.Body, nil
+}
+
+func (s *ProxyService) callHuaAn(ctx context.Context, ch *model.Channel, apiPath string, body map[string]interface{}) (*huaan.CallResult, error) {
+	if ch != nil && ch.HuaAnSettingID > 0 {
+		setting, err := s.huaanSettings.GetByID(ch.HuaAnSettingID)
+		if err == nil {
+			return s.callHuaAnWithSetting(ctx, setting, apiPath, body)
+		}
+	}
+	return s.huaan.Call(ctx, apiPath, body)
+}
+
+func (s *ProxyService) callHuaAnWithSetting(ctx context.Context, setting *model.HuaAnSetting, apiPath string, body map[string]interface{}) (*huaan.CallResult, error) {
+	cfg := *s.cfg
+	cfg.HuaAn = config.HuaAnConfig{
+		BaseURL:     setting.BaseURL,
+		APIPath:     s.cfg.HuaAn.APIPath,
+		ChannelCode: setting.ChannelCode,
+		Key:         setting.ChannelSecret,
+		SignEnabled: s.cfg.HuaAn.SignEnabled,
+	}
+	client := huaan.NewClient(&cfg, s.log, nil)
+	return client.Call(ctx, apiPath, body)
 }
 
 func (s *ProxyService) cacheBankList(ctx context.Context, channelCode string, respBytes []byte) {

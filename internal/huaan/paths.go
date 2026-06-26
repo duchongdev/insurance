@@ -13,6 +13,10 @@ const ProInsurancePath = "/proInsurance"
 // ProInsuranceUpstreamPath 华安侧预投保路径（相对 base_url，经 proxy 前缀）。
 const ProInsuranceUpstreamPath = "/proxy/upChannelApi/proInsurance"
 
+// ProductInfoByChannelPath 已废弃：华安侧不再提供/使用该接口，请改用 ProductInfoPath（product/info）。
+// 保留常量仅作历史引用，勿注册路由、勿在探测/集成测试中调用。
+const ProductInfoByChannelPath = "/getProductInfoByChannel"
+
 // ProductInfoPath 渠道侧获取渠道产品信息路径（挂载在 huaan.api_path 路由组下）。
 const ProductInfoPath = "/product/info"
 
@@ -26,6 +30,7 @@ const SmsSendPath = "/sms/send"
 const SmsSendUpstreamPath = "/common/channel/api/sms/send"
 
 // SmsValidPath 渠道侧短信验证码校验路径（挂载在 huaan.api_path 路由组下）。
+// 联调状态：未完成联调（华安上游验签/参数绑定规则待确认，见 docs/TESTING.md §7）。
 const SmsValidPath = "/sms/valid"
 
 // SmsValidUpstreamPath 华安侧短信验证码校验路径（相对 base_url，非 /upChannelApi 前缀）。
@@ -73,6 +78,21 @@ const PolicyInfoByPolicyIDPath = "/getPolicyInfoByPolicyId"
 // PolicyInfoByPolicyIDUpstreamPath 华安侧按保单 ID 查详情路径（相对 base_url，非 /upChannelApi 前缀）。
 const PolicyInfoByPolicyIDUpstreamPath = "/common/channel/api/getPolicyInfoByPolicyId"
 
+// GetPhoneByTokenPath 渠道侧一键登录解密手机号路径（挂载在 huaan.api_path 路由组下）。
+const GetPhoneByTokenPath = "/getPhoneByToken"
+
+// GetPhoneByTokenUpstreamPath 华安侧一键登录解密手机号路径（相对 base_url，非 /upChannelApi 前缀）。
+const GetPhoneByTokenUpstreamPath = "/common/channel/api/getPhoneByToken"
+
+// UpGradeInsPath 已废弃：华安侧不再使用，勿注册路由、勿在探测/集成测试中调用。
+const UpGradeInsPath = "/upGradeIns"
+
+// VerifyNoCodePath 已废弃：华安侧不再使用，勿注册路由、勿在探测/集成测试中调用。
+const VerifyNoCodePath = "/verifyNoCode"
+
+// PolicyInfoByPhoneNoPath 已废弃：华安侧不再使用，勿注册路由、勿在探测/集成测试中调用。
+const PolicyInfoByPhoneNoPath = "/getPolicyInfoByPhoneNo"
+
 // upstreamPathOverrides 渠道路径 → 华安完整路径后缀（相对 base_url）；未命中时拼 api_path + 渠道路径。
 var upstreamPathOverrides = map[string]string{
 	BankListPath:                    BankListUpstreamPath,
@@ -87,6 +107,7 @@ var upstreamPathOverrides = map[string]string{
 	LiabilitiesByProductIDPath:      LiabilitiesByProductIDUpstreamPath,
 	ProductPricesByPolicyIDPath:     ProductPricesByPolicyIDUpstreamPath,
 	PolicyInfoByPolicyIDPath:        PolicyInfoByPolicyIDUpstreamPath,
+	GetPhoneByTokenPath:             GetPhoneByTokenUpstreamPath,
 }
 
 // ResolveUpstreamPath 返回调用华安时的 URL 路径后缀（相对 base_url）。
@@ -100,14 +121,10 @@ func ResolveUpstreamPath(apiPathPrefix, channelPath string) string {
 // APIPaths 渠道 POST 接口路径（挂载在 config huaan.api_path 路由组下），与 Register 一一对应。
 var APIPaths = []string{
 	ProInsurancePath,                 // 预投保
-	"/upGradeIns",                    // 升级险种
 	"/getSignUrl",                    // 获取签约链接
-	"/verifyNoCode",                  // 无验证码实名
-	"/getPolicyInfoByPhoneNo",        // 按手机号查保单
 	"/getProductPricesByProductCode", // 按产品编码报价
 	BankListPath,                     // 银行列表
-	"/getProductInfoByChannel",       // 渠道产品列表
-	ProductInfoPath,                  // 获取渠道产品信息
+	ProductInfoPath,                  // 获取渠道产品信息（productCode 取自本接口）
 	SmsSendPath,                      // 发送短信验证码
 	SmsValidPath,                     // 短信验证码校验
 	SmsNoValidPath,                   // 免短信验证码注册登录
@@ -115,6 +132,7 @@ var APIPaths = []string{
 	PolicyByPhonePath,                // 通过手机号查询用户投保情况
 	UserInfoByPhoneNoPath,            // 根据手机号/用户 ID 查询用户信息
 	LiabilitiesByProductIDPath,       // 根据产品查询可选责任列表
-	ProductPricesByPolicyIDPath,    // 按保单 ID 查价格（收银台展示支付金额）
-	PolicyInfoByPolicyIDPath,       // 按保单 ID 查详情
+	ProductPricesByPolicyIDPath,      // 按保单 ID 查价格（收银台展示支付金额）
+	PolicyInfoByPolicyIDPath,         // 按保单 ID 查详情
+	GetPhoneByTokenPath,              // 一键登录解密手机号
 }

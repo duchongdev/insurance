@@ -23,9 +23,11 @@ func TestClient_Call_NoSign(t *testing.T) {
 func testClientCall(t *testing.T, signEnabled bool, cfgKey string) {
 	var gotPath string
 	var gotBody map[string]interface{}
+	var gotSign string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
+		gotSign = r.Header.Get("sign")
 		raw, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(raw, &gotBody)
 		w.Header().Set("Content-Type", "application/json")
@@ -47,25 +49,30 @@ func testClientCall(t *testing.T, signEnabled bool, cfgKey string) {
 	body := BuildRequestBody("CH001", map[string]interface{}{
 		"phoneNo": "13800138000",
 		"name":    "张三",
-		"key":     "channel-key-should-be-overwritten",
-		"sign":    "old-sign-should-be-overwritten",
+		"key":     "channel-key-should-be-stripped",
+		"sign":    "old-sign-should-be-stripped",
 	})
-	result, err := client.Call(t.Context(), "/getProductInfoByChannel", body)
+	result, err := client.Call(t.Context(), "/getProductPricesByProductCode", body)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotPath != "/upChannelApi/getProductInfoByChannel" {
+	if gotPath != "/upChannelApi/getProductPricesByProductCode" {
 		t.Fatalf("path=%s", gotPath)
 	}
-	if gotBody["key"] != cfgKey {
-		t.Fatalf("key=%v want=%q", gotBody["key"], cfgKey)
-	}
 	if signEnabled {
-		if !sign.Verify(sign.MapFromJSON(gotBody), cfgKey) {
-			t.Fatal("upstream sign verify failed")
+		if _, ok := gotBody["key"]; ok {
+			t.Fatalf("key should not be in body when sign enabled: %v", gotBody["key"])
 		}
-	} else if gotBody["sign"] != "" {
-		t.Fatalf("sign=%v want empty string", gotBody["sign"])
+		if !sign.VerifyHuaAnHeader(sign.MapFromJSON(gotBody), cfgKey, gotSign) {
+			t.Fatalf("upstream header sign verify failed, sign=%s", gotSign)
+		}
+	} else {
+		if gotBody["key"] != "" || gotBody["sign"] != "" {
+			t.Fatalf("key=%v sign=%v want empty", gotBody["key"], gotBody["sign"])
+		}
+		if gotSign != "" {
+			t.Fatalf("header sign=%q want empty", gotSign)
+		}
 	}
 	if result.HuaAnCode != 200 {
 		t.Fatalf("huaanCode=%d", result.HuaAnCode)
@@ -329,6 +336,38 @@ func TestClient_Call_LiabilitiesByProductIDUpstreamPath(t *testing.T) {
 	}
 }
 
+func TestClient_Call_GetPhoneByTokenUpstreamPath(t *testing.T) {
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"code":200,"message":"操作成功","data":"18212345678"}`))
+	}))
+	defer srv.Close()
+
+	cfg := &config.Config{
+		HuaAn: config.HuaAnConfig{
+			BaseURL:     srv.URL,
+			APIPath:     "/upChannelApi",
+			Key:         "test-key",
+			SignEnabled: false,
+		},
+		Server: config.ServerConfig{UpstreamTimeout: 5 * time.Second},
+	}
+	client := NewClient(cfg, nil, srv.Client())
+
+	body := BuildRequestBody("CH001", map[string]interface{}{
+		"userInformation": "one-click-info",
+		"token":           "one-click-token",
+	})
+	if _, err := client.Call(t.Context(), GetPhoneByTokenPath, body); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != GetPhoneByTokenUpstreamPath {
+		t.Fatalf("path=%s want=%s", gotPath, GetPhoneByTokenUpstreamPath)
+	}
+}
+
 func TestResolveUpstreamPath(t *testing.T) {
 	if got := ResolveUpstreamPath("/upChannelApi", ProductInfoPath); got != ProductInfoUpstreamPath {
 		t.Fatalf("product info path=%q want=%q", got, ProductInfoUpstreamPath)
@@ -362,5 +401,8 @@ func TestResolveUpstreamPath(t *testing.T) {
 	}
 	if got := ResolveUpstreamPath("/upChannelApi", PolicyInfoByPolicyIDPath); got != PolicyInfoByPolicyIDUpstreamPath {
 		t.Fatalf("policyInfoByPolicyId path=%q want=%q", got, PolicyInfoByPolicyIDUpstreamPath)
+	}
+	if got := ResolveUpstreamPath("/upChannelApi", GetPhoneByTokenPath); got != GetPhoneByTokenUpstreamPath {
+		t.Fatalf("getPhoneByToken path=%q want=%q", got, GetPhoneByTokenUpstreamPath)
 	}
 }

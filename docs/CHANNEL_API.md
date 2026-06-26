@@ -147,8 +147,8 @@ isSignType=0&key=c7ae4fc06ca25a73b96fbe2d199e1819&phoneNo=13968526776&signSerial
 | 序号  | 接口路径                             | 说明         | 三要素 |
 | --- | -------------------------------- | ---------- | --- |
 | 1   | `/getBankList`                   | 获取银行列表     | 否   |
-| 2   | `/getProductInfoByChannel`       | 查询渠道可售产品   | 否   |
-| 3   | `/product/info`                  | 获取渠道产品信息   | 是   |
+| 2   | ~~`/getProductInfoByChannel`~~   | ~~查询渠道可售产品~~ **（已废弃，请用 `/product/info`）** | —   |
+| 3   | `/product/info`                  | 获取渠道产品信息（含 productCode） | 是   |
 | 4   | `/sms/send`                      | 获取用户短信验证码  | 是   |
 | 5   | `/sms/valid`                     | 短信验证码校验    | 是   |
 | 6   | `/sms/noValid`                   | 免短信验证码注册登录 | 是   |
@@ -157,35 +157,33 @@ isSignType=0&key=c7ae4fc06ca25a73b96fbe2d199e1819&phoneNo=13968526776&signSerial
 | 9   | `/getUserInfoByPhoneNo`          | 查询用户信息     | 是（phoneNo 或 userId） |
 | 10  | `/getLiabilitiesByProductId`     | 查询可选责任列表   | 是   |
 | 11  | `/getProductPricesByProductCode` | 按产品编码查价格   | 是   |
-| 12  | `/verifyNoCode`                  | 无验证码实名     | 是   |
+| 12  | ~~`/verifyNoCode`~~              | ~~无验证码实名~~ **（已废弃）** | —   |
 | 13  | `/proInsurance`                  | 预投保        | 是   |
-| 14  | `/upGradeIns`                    | 保单升级       | 否   |
+| 14  | ~~`/upGradeIns`~~                | ~~保单升级~~ **（已废弃）** | —   |
 | 15  | `/getSignUrl`                    | 获取签约链接     | 是   |
-| 16  | `/getPolicyInfoByPhoneNo`        | 按手机号查保单    | 是   |
+| 16  | ~~`/getPolicyInfoByPhoneNo`~~    | ~~按手机号查保单~~ **（已废弃）** | —   |
 | 17  | `/getProductPricesByPolicyId`    | 按保单 ID 查价格（收银台） | 否   |
 | 18  | `/getPolicyInfoByPolicyId`       | 按保单 ID 查详情 | 否   |
+| 19  | `/getPhoneByToken`               | 一键登录解密手机号 | 否（响应 data 为手机号须加密） |
 
 
 ### 4.1 推荐调用顺序
 
 ```mermaid
 flowchart LR
-  A[getBankList] --> B[getProductInfoByChannel]
+  A[getBankList] --> B[product/info]
   B --> C[getProductPricesByProductCode]
-  C --> D[verifyNoCode]
-  D --> E[proInsurance]
-  E --> F[upGradeIns]
+  B --> E[proInsurance]
   E --> G[getSignUrl]
-  D --> H[getPolicyInfoByPhoneNo]
   E --> I[getProductPricesByPolicyId]
   E --> J[getPolicyInfoByPolicyId]
 ```
 
 
 
-- `productCode` 来自 `getProductInfoByChannel`。
+- `productCode` 来自 `product/info`（`getProductInfoByChannel` 已废弃）。
 - `policyId` 由下游在请求体中携带（通常来自其侧 `proInsurance` 结果）；本服务透明转发，不生成、不校验具体值。集成测试从 `proInsurance` 响应取 `policyId` 串联后续用例。
-- `userId` 来自 `verifyNoCode` 成功响应（`getSignUrl` 需要）。
+- `userId` 来自 `proInsurance` 成功响应（`getSignUrl` 需要）。
 - `bankCode`、`payChannelId`、`cardType` 来自 **同一条** `getBankList` 记录（`getSignUrl` 需要；`payChannelId` 与 `bankCode` 配套，禁止跨行组合）。
 
 ---
@@ -281,9 +279,11 @@ flowchart LR
 
 ---
 
-### 6.2 getProductInfoByChannel — 查询可售产品
+### 6.2 getProductInfoByChannel — 查询可售产品（已废弃）
 
-**路径**：`POST /upChannelApi/getProductInfoByChannel`
+> **已废弃**：华安侧不再使用该接口；请改用 **6.x product/info**（`/upChannelApi/product/info`）获取 `productCode`。本服务已从 `APIPaths` 移除，不再转发。
+
+**路径**：~~`POST /upChannelApi/getProductInfoByChannel`~~
 
 #### 请求参数
 
@@ -443,6 +443,8 @@ flowchart LR
 ---
 
 ### 6.5 sms/valid — 短信验证码校验
+
+**联调状态**：**未完成联调**（华安上游验签规则未确认；bridge 已注册路由并转发，集成测试默认 Skip，见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)）。
 
 **路径**：`POST /upChannelApi/sms/valid`（本服务转发华安 `POST /common/channel/api/sms/valid`）
 
@@ -858,7 +860,7 @@ flowchart LR
 
 **路径**：`POST /upChannelApi/getProductPricesByProductCode`
 
-`productCode` 须来自 `getProductInfoByChannel` 返回的 `data[].productCode`（与华安配套，勿手写）。华安直连实测见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md#getproductpricesbyproductcode--查询产品价格)。
+`productCode` 须来自 `product/info` 返回的 `data[].productCode`（`getProductInfoByChannel` 已废弃，勿手写）。
 
 #### 请求参数
 
@@ -866,7 +868,7 @@ flowchart LR
 | 字段                  | 必填  | 说明            |
 | ------------------- | --- | ------------- |
 | 公共字段                | 是   | 见 2.2         |
-| `productCode`       | 是   | 产品编码，来自 getProductInfoByChannel |
+| `productCode`       | 是   | 产品编码，来自 product/info |
 | `hasSocialSecurity` | 是   | 是否有社保，如 `"1"` |
 | `phoneNo`           | 是   | 三要素密文         |
 | `name`              | 是   | 三要素密文         |
@@ -955,9 +957,11 @@ flowchart LR
 
 ---
 
-### 6.11 verifyNoCode — 无验证码实名
+### 6.11 verifyNoCode — 无验证码实名（已废弃）
 
-**路径**：`POST /upChannelApi/verifyNoCode`
+> **已废弃**：本服务已从 `APIPaths` 移除，不再转发。
+
+**路径**：~~`POST /upChannelApi/verifyNoCode`~~
 
 #### 请求参数
 
@@ -1016,7 +1020,7 @@ flowchart LR
 
 **路径**：`POST /upChannelApi/proInsurance`（本服务转发华安 `POST /proxy/upChannelApi/proInsurance`）
 
-姓名、证件号录入后发起预投保；**返回成功**（`code=200`）则继续后续投保流程，失败则无法投保。`productCode` 通常来自 `getProductInfoByChannel` 或产品查询类接口。
+姓名、证件号录入后发起预投保；**返回成功**（`code=200`）则继续后续投保流程，失败则无法投保。`productCode` 来自 `product/info`。
 
 #### 请求参数
 
@@ -1086,9 +1090,11 @@ flowchart LR
 
 ---
 
-### 6.13 upGradeIns — 保单升级
+### 6.13 upGradeIns — 保单升级（已废弃）
 
-**路径**：`POST /upChannelApi/upGradeIns`
+> **已废弃**：本服务已从 `APIPaths` 移除，不再转发。
+
+**路径**：~~`POST /upChannelApi/upGradeIns`~~
 
 #### 请求参数
 
@@ -1137,7 +1143,7 @@ flowchart LR
 | `bankCode`                    | 是   | 银行编码，须与下方 `payChannelId` 来自同一条 `getBankList` 记录 |
 | `payChannelId`                | 是   | 支付渠道 ID，与 `bankCode` 配套，取自 `getBankList` 同条 `data[]` |
 | `cardType`                    | 是   | 卡类型，`"1"` 储蓄卡，`"2"` 信用卡（与所选银行 `debitCard`/`creditCard` 能力一致） |
-| `userId`                      | 是   | 用户 ID（**明文**，来自 `verifyNoCode`） |
+| `userId`                      | 是   | 用户 ID（**明文**，来自 `proInsurance`） |
 | `phoneNo` / `name` / `idCard` | 是   | 三要素密文                           |
 
 
@@ -1174,9 +1180,11 @@ flowchart LR
 
 ---
 
-### 6.15 getPolicyInfoByPhoneNo — 按手机号查保单
+### 6.15 getPolicyInfoByPhoneNo — 按手机号查保单（已废弃）
 
-**路径**：`POST /upChannelApi/getPolicyInfoByPhoneNo`
+> **已废弃**：本服务已从 `APIPaths` 移除，不再转发。请改用 `getPolicyInfoByPolicyId` 或 `policy/phone`。
+
+**路径**：~~`POST /upChannelApi/getPolicyInfoByPhoneNo`~~
 
 #### 请求参数
 
@@ -1406,6 +1414,51 @@ flowchart LR
 | `insuredName` | string | 被保人姓名（须加密） |
 | `phoneNo` | string | 被保人手机号（须加密） |
 | `hasSocialSecurity` | string | 是否有社保 |
+
+---
+
+### 6.18 getPhoneByToken — 一键登录解密手机号
+
+**路径**：`POST /upChannelApi/getPhoneByToken`（本服务转发华安 `POST /common/channel/api/getPhoneByToken`）
+
+一键登录完成后，凭 SDK 返回的 `userInformation` 与 `token` 解密获取用户手机号。
+
+#### 请求参数
+
+| 字段 | 必填 | 说明 |
+| ---- | ---- | ---- |
+| 公共字段 | 是 | 见 2.2 |
+| `userInformation` | 是 | 一键登录返回的用户信息 |
+| `token` | 是 | 一键登录返回的 token |
+
+#### 请求示例
+
+```json
+{
+  "timestamp": "1780402912568",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "YOUR_CHANNEL_KEY",
+  "userInformation": "xxx",
+  "token": "xxx",
+  "sign": "421fbad02166ea2479f270c434b08168"
+}
+```
+
+#### 响应示例（华安明文；经本服务返回时 `data` 手机号须加密）
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": "182xxxxxxxx"
+}
+```
+
+#### 响应字段
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| `data` | string | 用户手机号（返回渠道时须加密） |
 
 ---
 

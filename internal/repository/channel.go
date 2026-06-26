@@ -20,14 +20,35 @@ func NewChannelRepo(db *gorm.DB) *ChannelRepo {
 	return &ChannelRepo{db: db}
 }
 
-// GetByCode 按渠道编码查询启用中的渠道（status=1），供代理验签使用。
+// GetByCode 按渠道编码查询启用中的渠道（status=1）；同码多条启用时返回最早创建的一条。
 func (r *ChannelRepo) GetByCode(code string) (*model.Channel, error) {
 	var ch model.Channel
-	err := r.db.Where("channel_code = ? AND status = 1", code).First(&ch).Error
+	err := r.db.Where("channel_code = ? AND status = 1", code).Order("id asc").First(&ch).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrChannelNotFound
 	}
 	return &ch, err
+}
+
+// ExistsByHuaAnSettingID 是否已有渠道关联该华安配置。
+func (r *ChannelRepo) ExistsByHuaAnSettingID(huaAnSettingID uint64) (bool, error) {
+	if huaAnSettingID == 0 {
+		return false, nil
+	}
+	var count int64
+	err := r.db.Model(&model.Channel{}).Where("huaan_setting_id = ?", huaAnSettingID).Count(&count).Error
+	return count > 0, err
+}
+
+// HasActiveByCode 是否存在其他启用渠道使用相同编码。
+func (r *ChannelRepo) HasActiveByCode(code string, excludeID uint64) (bool, error) {
+	var count int64
+	q := r.db.Model(&model.Channel{}).Where("channel_code = ? AND status = 1", code)
+	if excludeID > 0 {
+		q = q.Where("id <> ?", excludeID)
+	}
+	err := q.Count(&count).Error
+	return count > 0, err
 }
 
 // List 分页列出全部渠道（含禁用），按 id 降序。

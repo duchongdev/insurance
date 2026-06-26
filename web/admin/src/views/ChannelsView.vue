@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageCard from '@/components/PageCard.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { createChannel, deleteChannel, fetchChannels, type Channel } from '@/api/admin'
+import {
+  createChannel,
+  deleteChannel,
+  fetchChannels,
+  fetchHuaAnConfigs,
+  updateChannel,
+  type Channel,
+  type HuaAnConfig,
+} from '@/api/admin'
 import { maskSecret } from '@/utils/auth'
 
 const loading = ref(false)
@@ -15,31 +23,65 @@ const pageSize = ref(20)
 const statusFilter = ref<number | undefined>(undefined)
 const keyword = ref('')
 
-const createVisible = ref(false)
-const creating = ref(false)
+const huaAnConfigs = ref<HuaAnConfig[]>([])
+const dialogVisible = ref(false)
+const editingId = ref<number | null>(null)
+const saving = ref(false)
+
 const form = reactive({
+  huaanSettingId: undefined as number | undefined,
   channelCode: '',
   channelName: '',
-  huaAnKey: '',
   channelKey: '',
   callbackUrl: '',
+  status: 1,
 })
 
 const revealedIds = ref<Set<number>>(new Set())
-
 const filteredList = ref<Channel[]>([])
 
+const linkedHuaAnSettingIds = ref<Set<number>>(new Set())
+
+const huaAnOptions = computed(() =>
+  huaAnConfigs.value
+    .filter((c) => c.id && (!editingId.value ? !linkedHuaAnSettingIds.value.has(c.id!) : true))
+    .map((c) => ({
+      value: c.id!,
+      label: `${c.channelCode} · ${c.envType === 'prod' ? '生产环境' : '测试环境'}${c.name ? ` · ${c.name}` : ''}`,
+      channelCode: c.channelCode,
+      envType: c.envType,
+    })),
+)
+
+function envLabel(envType?: string) {
+  return envType === 'prod' ? '生产环境' : '测试环境'
+}
+
 function resetForm() {
+  form.huaanSettingId = undefined
   form.channelCode = ''
   form.channelName = ''
-  form.huaAnKey = ''
   form.channelKey = ''
   form.callbackUrl = ''
+  form.status = 1
+  editingId.value = null
 }
 
 function openCreateDialog() {
   resetForm()
-  createVisible.value = true
+  dialogVisible.value = true
+  void loadLinkedHuaAnSettings()
+}
+
+function openEditDialog(row: Channel) {
+  editingId.value = row.id
+  form.huaanSettingId = row.huaanSettingId
+  form.channelCode = row.channelCode
+  form.channelName = row.channelName || ''
+  form.channelKey = ''
+  form.callbackUrl = row.callbackUrl
+  form.status = row.status
+  dialogVisible.value = true
 }
 
 function isRevealed(id: number) {
@@ -48,11 +90,8 @@ function isRevealed(id: number) {
 
 function toggleReveal(id: number) {
   const next = new Set(revealedIds.value)
-  if (next.has(id)) {
-    next.delete(id)
-  } else {
-    next.add(id)
-  }
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
   revealedIds.value = next
 }
 
@@ -91,6 +130,26 @@ function applyFilter() {
   filteredList.value = rows
 }
 
+async function loadLinkedHuaAnSettings() {
+  try {
+    const { data } = await fetchChannels(1, 200)
+    linkedHuaAnSettingIds.value = new Set(
+      (data.list || []).filter((c) => c.huaanSettingId).map((c) => c.huaanSettingId!),
+    )
+  } catch {
+    linkedHuaAnSettingIds.value = new Set()
+  }
+}
+
+async function loadHuaAnConfigs() {
+  try {
+    const { data } = await fetchHuaAnConfigs()
+    huaAnConfigs.value = data.list || []
+  } catch {
+    huaAnConfigs.value = []
+  }
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -107,36 +166,55 @@ function onFilterChange() {
   applyFilter()
 }
 
-async function onCreate() {
-  if (!form.channelCode.trim() || !form.huaAnKey.trim() || !form.callbackUrl.trim()) {
-    ElMessage.warning('请填写渠道编码、华安密钥和回调地址')
+async function onSave() {
+  if (!form.callbackUrl.trim()) {
+    ElMessage.warning('请填写回调地址')
     return
   }
-  creating.value = true
+  if (!editingId.value && !form.huaanSettingId) {
+    ElMessage.warning('请选择华安配置中的渠道编码')
+    return
+  }
+
+  saving.value = true
   try {
-    const { data } = await createChannel({
-      channelCode: form.channelCode.trim(),
-      channelName: form.channelName.trim(),
-      huaAnKey: form.huaAnKey.trim(),
-      channelKey: form.channelKey.trim() || undefined,
-      callbackUrl: form.callbackUrl.trim(),
-      status: 1,
-    })
-    createVisible.value = false
-    const autoKey = !form.channelKey.trim()
-    if (autoKey && data.channelKey) {
-      await ElMessageBox.alert(
-        `渠道编码：${data.channelCode}\n渠道密钥（已自动生成）：${data.channelKey}\n华安密钥：${data.huaAnKey}`,
-        '创建成功，请妥善保存密钥',
-        { confirmButtonText: '知道了' },
-      )
+    if (editingId.value) {
+      await updateChannel(editingId.value, {
+        channelName: form.channelName.trim(),
+        channelKey: form.channelKey.trim() || undefined,
+        callbackUrl: form.callbackUrl.trim(),
+        status: form.status,
+      })
+      ElMessage.success('已保存')
     } else {
-      ElMessage.success('创建成功')
+      const { data } = await createChannel({
+        huaanSettingId: form.huaanSettingId!,
+        channelName: form.channelName.trim() || undefined,
+        channelKey: form.channelKey.trim() || undefined,
+        callbackUrl: form.callbackUrl.trim(),
+        status: form.status,
+      })
+      dialogVisible.value = false
+      const autoKey = !form.channelKey.trim()
+      if (autoKey && data.channelKey) {
+        await ElMessageBox.alert(
+          `渠道编码：${data.channelCode}\n渠道密钥（已自动生成）：${data.channelKey}`,
+          '创建成功，请妥善保存渠道密钥',
+          { confirmButtonText: '知道了' },
+        )
+      } else {
+        ElMessage.success('创建成功')
+      }
+      resetForm()
     }
-    resetForm()
+    if (editingId.value) {
+      dialogVisible.value = false
+      resetForm()
+    }
     await loadData()
+    await loadLinkedHuaAnSettings()
   } finally {
-    creating.value = false
+    saving.value = false
   }
 }
 
@@ -145,6 +223,7 @@ async function onDelete(row: Channel) {
   await deleteChannel(row.id)
   ElMessage.success('已删除')
   await loadData()
+  await loadLinkedHuaAnSettings()
 }
 
 function onPageChange(p: number) {
@@ -152,7 +231,21 @@ function onPageChange(p: number) {
   loadData()
 }
 
-onMounted(loadData)
+function channelEnvType(row: Channel): string {
+  if (row.envType) return row.envType
+  const cfg = huaAnConfigs.value.find((c) => c.id === row.huaanSettingId)
+  return cfg?.envType || 'test'
+}
+
+function linkedHuaAnLabel(row: Channel): string {
+  return row.channelCode
+}
+
+onMounted(async () => {
+  await loadHuaAnConfigs()
+  await loadLinkedHuaAnSettings()
+  await loadData()
+})
 </script>
 
 <template>
@@ -187,10 +280,22 @@ onMounted(loadData)
       <template #header>
         <h3 class="card-title">渠道列表</h3>
       </template>
-      <p class="hint">密钥在库内为明文存储，列表默认脱敏显示；点击「显示」可查看完整内容，「复制」可写入剪贴板。</p>
+      <p class="hint">
+        渠道编码须从「华安配置」中选择；华安密钥随关联配置自动同步，无需手填。渠道密钥默认脱敏显示，可点击「显示」或「复制」。
+      </p>
       <el-table v-loading="loading" :data="filteredList" size="default">
         <el-table-column prop="id" label="编号" width="72" />
-        <el-table-column prop="channelCode" label="渠道编码" min-width="120" />
+        <el-table-column label="渠道编码" min-width="120">
+          <template #default="{ row }">{{ linkedHuaAnLabel(row) }}</template>
+        </el-table-column>
+        <el-table-column label="华安环境" width="100" align="center">
+          <template #default="{ row }">
+            <StatusTag
+              :status="channelEnvType(row) === 'prod' ? 'warning' : 'info'"
+              :label="envLabel(channelEnvType(row))"
+            />
+          </template>
+        </el-table-column>
         <el-table-column prop="channelName" label="渠道名称" min-width="120">
           <template #default="{ row }">{{ row.channelName || '—' }}</template>
         </el-table-column>
@@ -218,8 +323,9 @@ onMounted(loadData)
             <StatusTag :status="row.status === 1 ? 'success' : 'default'" :label="row.status === 1 ? '启用' : '禁用'" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right" align="center">
+        <el-table-column label="操作" width="120" fixed="right" align="center">
           <template #default="{ row }">
+            <el-button type="primary" link @click="openEditDialog(row)">编辑</el-button>
             <el-button type="danger" link @click="onDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -237,27 +343,56 @@ onMounted(loadData)
     </PageCard>
   </div>
 
-  <el-dialog v-model="createVisible" title="新增渠道" width="520px" destroy-on-close @closed="resetForm">
+  <el-dialog
+    v-model="dialogVisible"
+    :title="editingId ? '编辑渠道' : '新增渠道'"
+    width="520px"
+    destroy-on-close
+    @closed="resetForm"
+  >
     <el-form label-width="100px">
-      <el-form-item label="渠道编码" required>
-        <el-input v-model="form.channelCode" placeholder="channelCode" />
+      <el-form-item v-if="editingId" label="渠道编码">
+        <el-input :model-value="form.channelCode" disabled />
+      </el-form-item>
+      <el-form-item v-else label="华安配置" required>
+        <el-select
+          v-model="form.huaanSettingId"
+          placeholder="请选择华安配置（生产/测试均可）"
+          style="width: 100%"
+          filterable
+        >
+          <el-option
+            v-for="opt in huaAnOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
+        <p v-if="huaAnOptions.length === 0" class="field-hint">请先在「华安配置」中添加配置，或各配置均已关联渠道</p>
       </el-form-item>
       <el-form-item label="渠道名称">
         <el-input v-model="form.channelName" placeholder="可选" />
       </el-form-item>
-      <el-form-item label="华安密钥" required>
-        <el-input v-model="form.huaAnKey" placeholder="华安分配的 huaAnKey" show-password />
-      </el-form-item>
       <el-form-item label="回调地址" required>
         <el-input v-model="form.callbackUrl" placeholder="https://渠道域名/投保结果回调" />
       </el-form-item>
+      <el-form-item v-if="editingId" label="状态">
+        <el-radio-group v-model="form.status">
+          <el-radio :value="1">启用</el-radio>
+          <el-radio :value="0">禁用</el-radio>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item label="渠道密钥">
-        <el-input v-model="form.channelKey" placeholder="留空则自动生成 32 位十六进制" show-password />
+        <el-input
+          v-model="form.channelKey"
+          :placeholder="editingId ? '留空则不修改' : '留空则自动生成 32 位十六进制'"
+          show-password
+        />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="createVisible = false">取消</el-button>
-      <el-button type="primary" :loading="creating" @click="onCreate">确定</el-button>
+      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="onSave">确定</el-button>
     </template>
   </el-dialog>
 </template>
@@ -272,6 +407,12 @@ onMounted(loadData)
 .hint {
   margin: 0 0 16px;
   font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 

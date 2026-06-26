@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -91,18 +93,63 @@ func (s *AdminService) CreateChannel(ch *model.Channel) error {
 	if err := ValidateChannelConfig(ch); err != nil {
 		return err
 	}
+	if ch.HuaAnSettingID > 0 {
+		exists, err := s.channels.ExistsByHuaAnSettingID(ch.HuaAnSettingID)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("%w: 该华安配置已关联渠道", ErrInvalidChannelConfig)
+		}
+	}
+	if ch.Status == 0 {
+		ch.Status = 1
+	}
+	if ch.Status == 1 {
+		active, err := s.channels.HasActiveByCode(ch.ChannelCode, 0)
+		if err != nil {
+			return err
+		}
+		if active {
+			return fmt.Errorf("%w: 渠道编码 %s 已有启用的渠道，请先禁用后再创建", ErrInvalidChannelConfig, ch.ChannelCode)
+		}
+	}
 	if ch.ChannelKey == "" {
 		ch.ChannelKey = GenerateChannelKey()
 	}
 	return s.channels.Create(ch)
 }
 
-// UpdateChannel 全量更新渠道记录（GORM Save）。
-func (s *AdminService) UpdateChannel(ch *model.Channel) error {
-	if err := ValidateChannelConfig(ch); err != nil {
-		return err
+// UpdateChannel 更新渠道可编辑字段；channelKey 为空时保留原值。
+func (s *AdminService) UpdateChannel(id uint64, input *model.Channel) (*model.Channel, error) {
+	existing, err := s.channels.GetByID(id)
+	if err != nil {
+		return nil, err
 	}
-	return s.channels.Update(ch)
+	existing.ChannelName = strings.TrimSpace(input.ChannelName)
+	existing.CallbackURL = strings.TrimSpace(input.CallbackURL)
+	if input.Status == 0 || input.Status == 1 {
+		existing.Status = input.Status
+	}
+	if strings.TrimSpace(input.ChannelKey) != "" {
+		existing.ChannelKey = strings.TrimSpace(input.ChannelKey)
+	}
+	if err := ValidateChannelConfig(existing); err != nil {
+		return nil, err
+	}
+	if existing.Status == 1 {
+		active, err := s.channels.HasActiveByCode(existing.ChannelCode, existing.ID)
+		if err != nil {
+			return nil, err
+		}
+		if active {
+			return nil, fmt.Errorf("%w: 渠道编码 %s 已有其他启用的渠道", ErrInvalidChannelConfig, existing.ChannelCode)
+		}
+	}
+	if err := s.channels.Update(existing); err != nil {
+		return nil, err
+	}
+	return existing, nil
 }
 
 // DeleteChannel 按主键删除渠道。

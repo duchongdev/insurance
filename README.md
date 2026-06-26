@@ -389,11 +389,11 @@ ssh root@10.41.61.41 'cd /home/ins && ./scripts/stop.sh'
 
 ## 功能概览
 
-- **渠道 API**：完整实现华安 `/upChannelApi` 下 10 个接口，并新增 `/common/channel/api/*` 扩展接口（产品信息、短信、查价、投保情况等）
+- **渠道 API**：完整实现华安 `/upChannelApi` 下 10 个接口，并新增 `/common/channel/api/*` 扩展接口（产品信息、短信、查价、投保情况、**一键登录解密手机号** 等）
 - **双密钥体系**：渠道 `channelKey`（本服务分配）↔ 华安 `huaAnKey`（华安分配），管理后台维护映射
 - **三要素加解密**：默认渠道侧 AES-256-GCM；可按渠道关闭（明文对接）。是否加密由 Redis 渠道配置缓存决定，管理后台创建/修改/删除渠道时同步更新缓存；**新建渠道默认须加密**
 - **银行列表**：`getBankList` 转发华安 `/common/channel/api/getBankList`；支持 Redis → `bank_info_t` → 华安 多级缓存；管理后台可查询与手动刷新
-- **管理后台**：Vue 3 + Element Plus（`web/admin/`），渠道配置（含回调地址）、银行列表、管理员登录
+- **管理后台**：Vue 3 + Element Plus（`web/admin/`），**华安配置**（支持多条生产/测试环境配置、分别连通性测试）、渠道配置（关联华安配置并展示环境类型）、银行列表（按所选华安配置同步）、管理员登录
 - **投保结果回调**：华安 `POST /huaan/callback/insureNotify` → 本服务转发至渠道 `callbackUrl`
 - **运维**：健康检查（MySQL + Redis）、Nginx 反向代理、JSON 结构化服务日志（轮转、gzip 归档、90 天自动清理）
 
@@ -427,7 +427,7 @@ cp config/config.yaml.example config/config.yaml
 
 - 渠道 API：`http://localhost/upChannelApi/...`（或配置 SSL 后 `https://localhost/...`）
 - 管理后台：`http://localhost/`（Docker/Nginx）或 `cd web/admin && npm run dev`（本地开发）
-- 默认管理员：见 `config/config.yaml` 中 `admin` 段（首次启动自动创建）
+- 默认管理员：内置账号 **admin** / **Admin123!@#**（首次启动自动创建）
 - OpenAPI：`http://localhost/openapi.yaml`
 
 ## 配置
@@ -439,8 +439,9 @@ cp config/config.yaml.example config/config.yaml
 | `BRIDGE_DATABASE_DSN` | MySQL/MariaDB 连接串 |
 | `BRIDGE_REDIS_PASSWORD` | Redis 认证密码 |
 | `BRIDGE_REDIS_BANK_LIST_TTL` | 银行列表缓存 TTL，默认 `0`（不过期） |
-| `BRIDGE_HUAAN_BASE_URL` | 华安域名 |
-| `BRIDGE_HUAAN_KEY` | 请求华安时 body 中的 `key` 字段 |
+| `BRIDGE_HUAAN_BASE_URL` | 华安域名（可被管理后台「华安配置」覆盖并持久化至库） |
+| `BRIDGE_HUAAN_CHANNEL_CODE` | 华安侧渠道编码 |
+| `BRIDGE_HUAAN_KEY` | 华安侧密钥，请求华安时 body 中的 `key` 字段 |
 | `BRIDGE_HUAAN_SIGN_ENABLED` | 是否按华安规则生成 `sign`；默认 `false` |
 | `BRIDGE_SECURITY_DATA_ENCRYPTION_KEY` | 32 字节，渠道三要素 AES 加解密 |
 | `BRIDGE_SECURITY_JWT_SECRET` | 管理后台 JWT |
@@ -518,6 +519,7 @@ docker-compose.yml
 | 表 | 用途 |
 |----|------|
 | `channels` | 渠道与双密钥映射 |
+| `huaan_settings` | 华安上游连接配置（多条，含 env_type 生产/测试） |
 | `admin_users` | 管理后台登录账号 |
 | `bank_info_t` | 银行列表（getBankList 同步） |
 

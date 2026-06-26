@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import PageCard from '@/components/PageCard.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import StatusTag from '@/components/StatusTag.vue'
-import { fetchBanks, refreshBankList, type BankRecord } from '@/api/admin'
-
-const DEFAULT_CHANNEL_CODE = 'I8p0Wn'
-const DEFAULT_HUAAN_KEY = 'd158da0dbddf4bec8d4f703fcd6a82cb'
+import { fetchBanks, fetchHuaAnConfigs, refreshBankList, type BankRecord, type HuaAnConfig } from '@/api/admin'
 
 const loading = ref(false)
 const list = ref<BankRecord[]>([])
@@ -17,11 +14,24 @@ const pageSize = ref(20)
 const statusFilter = ref<number | undefined>(undefined)
 const keyword = ref('')
 
-const channelCode = ref(DEFAULT_CHANNEL_CODE)
-const huaAnKey = ref(DEFAULT_HUAAN_KEY)
+const huaAnConfigs = ref<HuaAnConfig[]>([])
+const selectedSettingId = ref<number | undefined>(undefined)
 const fetching = ref(false)
 
 const filteredList = ref<BankRecord[]>([])
+
+const huaAnOptions = computed(() =>
+  huaAnConfigs.value
+    .filter((c) => c.id)
+    .map((c) => ({
+      value: c.id!,
+      label: `${c.envType === 'prod' ? '生产环境' : '测试环境'} · ${c.channelCode}${c.name ? ` · ${c.name}` : ''}`,
+    })),
+)
+
+const selectedConfig = computed(() =>
+  huaAnConfigs.value.find((c) => c.id === selectedSettingId.value),
+)
 
 function applyFilter() {
   let rows = list.value
@@ -37,6 +47,18 @@ function applyFilter() {
   filteredList.value = rows
 }
 
+async function loadHuaAnConfigs() {
+  try {
+    const { data } = await fetchHuaAnConfigs()
+    huaAnConfigs.value = data.list || []
+    if (!selectedSettingId.value && huaAnConfigs.value.length > 0) {
+      selectedSettingId.value = huaAnConfigs.value[0].id
+    }
+  } catch {
+    huaAnConfigs.value = []
+  }
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -50,15 +72,13 @@ async function loadData() {
 }
 
 async function onFetchBankList() {
-  const code = channelCode.value.trim()
-  const key = huaAnKey.value.trim()
-  if (!code || !key) {
-    ElMessage.warning('请填写渠道码和华安密钥')
+  if (!selectedSettingId.value) {
+    ElMessage.warning('请先在「华安配置」中添加配置，并选择要使用的华安配置')
     return
   }
   fetching.value = true
   try {
-    await refreshBankList(code, key)
+    await refreshBankList(selectedSettingId.value)
     ElMessage.success('银行列表已获取并更新')
     page.value = 1
     await loadData()
@@ -81,13 +101,29 @@ function onKeywordChange() {
   applyFilter()
 }
 
-onMounted(loadData)
+onMounted(async () => {
+  await loadHuaAnConfigs()
+  await loadData()
+})
 </script>
 
 <template>
   <div>
     <PageToolbar title="银行列表" subtitle="华安 getBankList 全量同步与本地缓存">
       <template #filters>
+        <el-select
+          v-model="selectedSettingId"
+          placeholder="选择华安配置"
+          style="width: 280px"
+          filterable
+        >
+          <el-option
+            v-for="opt in huaAnOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
         <el-input
           v-model="keyword"
           placeholder="搜索银行编码/名称"
@@ -112,18 +148,16 @@ onMounted(loadData)
       </template>
     </PageToolbar>
 
-    <PageCard title="同步配置">
+    <PageCard title="同步说明">
       <p class="desc">
-        请求华安 getBankList，全量覆盖更新 bank_info_t 并刷新 Redis 缓存。下游渠道调用本服务时优先读缓存，未命中则读库，库中无数据再请求华安。
+        请求华安 getBankList，全量覆盖更新 bank_info_t 并刷新 Redis 缓存。请在上方选择
+        <router-link to="/huaan-config">华安配置</router-link>
+        后再点击「获取银行列表」；当前选择：
+        <strong v-if="selectedConfig">
+          {{ selectedConfig.envType === 'prod' ? '生产环境' : '测试环境' }} · {{ selectedConfig.channelCode }}
+        </strong>
+        <strong v-else>未选择</strong>。
       </p>
-      <el-form inline class="sync-form">
-        <el-form-item label="渠道码">
-          <el-input v-model="channelCode" placeholder="channelCode" style="width: 180px" />
-        </el-form-item>
-        <el-form-item label="华安密钥">
-          <el-input v-model="huaAnKey" placeholder="huaAnKey" show-password style="width: 280px" />
-        </el-form-item>
-      </el-form>
     </PageCard>
 
     <PageCard title="银行数据">
@@ -158,7 +192,7 @@ onMounted(loadData)
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="!loading && filteredList.length === 0" class="empty">暂无银行数据，请先点击「获取银行列表」</div>
+      <div v-if="!loading && filteredList.length === 0" class="empty">暂无银行数据，请先选择华安配置并点击「获取银行列表」</div>
       <div class="pager">
         <el-pagination
           background
@@ -177,16 +211,17 @@ onMounted(loadData)
 .desc {
   color: var(--color-text-muted);
   font-size: 13px;
-  margin: 0 0 16px;
+  margin: 0;
   line-height: 1.6;
 }
 
-.sync-form {
-  margin-bottom: 0;
+.desc a {
+  color: var(--color-primary);
+  text-decoration: none;
 }
 
-.sync-form :deep(.el-form-item__label) {
-  color: var(--color-text-secondary);
+.desc a:hover {
+  text-decoration: underline;
 }
 
 .text-muted {

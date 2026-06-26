@@ -30,6 +30,6 @@ func (h *CallbackHandler) insureNotify(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"code": 400, "message": "read body failed"})
 		return
 	}
-	out, status, _ := h.proxy.HandleInsureNotify(c.Request.Context(), raw)
+	out, status, _ := h.proxy.HandleInsureNotify(c.Request.Context(), raw, c.GetHeader("sign"))
 	c.Data(status, "application/json; charset=utf-8", out)
 }

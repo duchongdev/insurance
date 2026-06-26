@@ -58,7 +58,7 @@ set -a && source .env.huaan && set +a
 | `HUAAN_TEST_SMS_CODE` | `sms/valid` | 短信验证码明文 |
 | `HUAAN_TEST_USER_ID` | 否 | 仅当 `proInsurance` 未返回 `userId` 时，`getSignUrl` 测试备用 |
 
-`productCode`、`policyId` **无需配置**：集成测试分别从 `getProductInfoByChannel`、`proInsurance` 响应解析（与生产一致——`policyId` 由下游请求携带，本服务只转发）。
+`productCode`、`policyId` **无需配置**：集成测试分别从 `product/info`、`proInsurance` 响应解析（与生产一致——`policyId` 由下游请求携带，本服务只转发）。
 
 `.env.huaan` 已加入 `.gitignore`，**勿提交**。
 
@@ -82,8 +82,8 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 - 渠道调用本服务的请求/响应样例见 **[CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md)**（与华安原文成对对照）。
 - 华安返回的明文 PII 在测试日志中**原样输出**（`t.Log`），不做重新加密。
 - 未配置必填环境变量时，测试 `t.Skip` 跳过。
-- `getProductPricesByProductCode`、`proInsurance` 的 `productCode` **自动**从 `getProductInfoByChannel` 获取（`TestHuaAnDirect_ProductFromChannel`）。
-- 依赖 `policyId` 的接口（`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`upGradeIns`、`getSignUrl`）在测试中 **先调 proInsurance** 取 `policyId`（`TestHuaAnDirect_PolicyFromProInsurance`、`TestHuaAnDirect_GetSignUrl`）。
+- `getProductPricesByProductCode`、`proInsurance` 的 `productCode` **自动**从 `product/info` 获取（`TestHuaAnDirect_ProductFromProductInfo`）。
+- 依赖 `policyId` 的接口（`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`getSignUrl`）在测试中 **先调 proInsurance** 取 `policyId`（`TestHuaAnDirect_PolicyFromProInsurance`、`TestHuaAnDirect_GetSignUrl`）。
 - `proInsurance` 集成测试默认带 `hasSocialSecurity: 1`（整数）、`isUpgrade: 0`、`autoRenew: 1`；`getProductPricesByProductCode` 仍用 `hasSocialSecurity: "1"`（字符串）并需三要素；`getProductPricesByPolicyId` **仅需 `policyId`**。
 
 ### 3.4 覆盖的接口
@@ -93,13 +93,10 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 | 路径 | 说明 |
 |------|------|
 | `/proInsurance` | 预投保（上游 `/proxy/upChannelApi/proInsurance`） |
-| `/upGradeIns` | 升级险种 |
 | `/getSignUrl` | 获取签约链接（须 `payChannelId`，见 **3.6** 专项测试） |
-| `/verifyNoCode` | 无验证码实名 |
-| `/getPolicyInfoByPhoneNo` | 按手机号查保单 |
 | `/getProductPricesByProductCode` | 按产品编码报价 |
 | `/getBankList` | 银行列表（上游 `/common/channel/api/getBankList`） |
-| `/getProductInfoByChannel` | 渠道产品列表 |
+| `/product/info` | 获取渠道产品信息（productCode 取自本接口） |
 | `/product/info` | 获取渠道产品信息（上游 `/common/channel/api/product/info`） |
 | `/sms/send` | 发送短信验证码（上游 `/common/channel/api/sms/send`） |
 | `/sms/valid` | 短信验证码校验（上游 `/common/channel/api/sms/valid`） |
@@ -110,6 +107,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 | `/getLiabilitiesByProductId` | 查询可选责任列表（上游 `/common/channel/api/getLiabilitiesByProductId`） |
 | `/getProductPricesByPolicyId` | 按保单 ID 查价格（上游 `/common/channel/api/getProductPricesByPolicyId`，仅需 policyId） |
 | `/getPolicyInfoByPolicyId` | 按保单 ID 查详情（上游 `/common/channel/api/getPolicyInfoByPolicyId`，仅需 policyId） |
+| `/getPhoneByToken` | 一键登录解密手机号（上游 `/common/channel/api/getPhoneByToken`，需 userInformation、token） |
 
 测试代码：`internal/huaan/client_integration_test.go`。
 
@@ -118,13 +116,13 @@ go test -tags=integration ./internal/huaan/ -v -count=1
 无需额外业务参数，配置好 `HUAAN_BASE_URL`、`HUAAN_CHANNEL_CODE` 即可：
 
 - `/getBankList`
-- `/getProductInfoByChannel`
+- `/product/info`
 
 含 PII 的接口需配置 `HUAAN_TEST_PHONE` / `NAME` / `ID_CARD`。
 
-### 3.6 产品报价与投保（先 getProductInfoByChannel）
+### 3.6 产品报价与投保（先 product/info）
 
-`getProductPricesByProductCode`、`proInsurance` 依赖的 `productCode` 来自 **`getProductInfoByChannel` 响应**（字段说明见 [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md)），与文档样例一致，例如 `ZFHLW1041001`、`ZFHLW1040003`。
+`getProductPricesByProductCode`、`proInsurance` 依赖的 `productCode` 来自 **`product/info` 响应**（须三要素）。`getProductInfoByChannel` 已废弃，不再测试。
 
 ```bash
 go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_ProductFromChannel
@@ -134,13 +132,13 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_Pro
 
 ### 3.7 依赖 policyId 的接口（先 proInsurance）
 
-`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId`、`upGradeIns` 的 `policyId` 来自 **`proInsurance` 成功响应的 `data.policyId`**，无需 `HUAAN_TEST_POLICY_ID`。
+`getPolicyInfoByPolicyId`、`getProductPricesByPolicyId` 的 `policyId` 来自 **`proInsurance` 成功响应的 `data.policyId`**，无需 `HUAAN_TEST_POLICY_ID`。
 
 ```bash
 go test -tags=integration ./internal/huaan/ -v -count=1 -run TestHuaAnDirect_PolicyFromProInsurance
 ```
 
-流程：getProductInfoByChannel → proInsurance → 用返回的 `policyId` 调上述三个接口。
+流程：product/info → proInsurance → 用返回的 `policyId` 调上述三个接口。
 
 ### 3.8 getSignUrl 专项测试
 
@@ -232,7 +230,7 @@ Authorization: Bearer <token>
 |------|----------|----------|--------|----------|------|------|
 | 获取渠道产品信息 | `POST /upChannelApi/product/info` | `POST /common/channel/api/product/info` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 2026-06-25 直连试跑：`code=500`，`message=未授权的访问来源`；待确认该域名下 `channelCode`、IP 白名单及是否须开启签名后统一联调 |
 | 获取用户短信验证码 | `POST /upChannelApi/sms/send` | `POST /common/channel/api/sms/send` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 新增接口，待与 product/info 一并联调 |
-| 短信验证码校验 | `POST /upChannelApi/sms/valid` | `POST /common/channel/api/sms/valid` | `mobile` + `smsCode` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 `data` 含三要素须加密；需先 sms/send 取得验证码 |
+| 短信验证码校验 | `POST /upChannelApi/sms/valid` | `POST /common/channel/api/sms/valid` | `mobile` + `smsCode` | `http://47.97.156.18:9040`（测试） | **未完成联调** | 2026-06-25 多方案试签：仅 `channelCode+timestamp+key` 可过验签但业务报 500「参数为空」；含 `mobile`/`smsCode` 或去掉 `key` 后缀均 601；待华安提供官方验签示例后继续 |
 | 免短信验证码注册登录 | `POST /upChannelApi/sms/noValid` | `POST /common/channel/api/sms/noValid` | `mobile` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 `data` 含三要素须加密；无需 smsCode |
 | 查询产品价格 | `POST /upChannelApi/priceByUser` | `POST /common/channel/api/priceByUser` | `idCard` + 业务字段 | `https://ins.api.hahealth.ink/` | **待测试** | `hasSocialSecurity` 为整数；`productPriceList` 可选 |
 | 查询用户投保情况 | `POST /upChannelApi/policy/phone` | `POST /common/channel/api/policy/phone` | `phoneNo` 或 `userId` | `https://ins.api.hahealth.ink/` | **待测试** | 仅返回基础版；`phoneNo`/`userId` 二选一 |

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/huaan/insurance-bridge/internal/config"
-	"github.com/huaan/insurance-bridge/internal/pkg/sign"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +21,7 @@ var ErrTimeout = errors.New("upstream timeout")
 // ErrUnavailable 华安不可达或连接失败。
 var ErrUnavailable = errors.New("upstream unavailable")
 
-// Client 华安上游 HTTP 客户端：写入 key/sign、POST、返回原始 JSON。
+// Client 华安上游 HTTP 客户端：按配置写入 sign（请求头或空 body 字段）、POST、返回原始 JSON。
 type Client struct {
 	cfg        *config.Config
 	log        *zap.Logger
@@ -47,17 +46,18 @@ type CallResult struct {
 	HuaAnCode  int // 响应 JSON 中 code 字段，解析失败时为 0
 }
 
-// Call 向华安 POST 请求。body 会被原地修改：始终写入 config 中的 key；开启签名时计算 sign，否则 sign 为空字符串。
+// Call 向华安 POST 请求。
+// sign_enabled=true：按华安规则计算 sign 写入请求头，密钥仅参与签名不写 body；
+// sign_enabled=false：body 中 key 为空字符串、sign 为空字符串（兼容旧环境）。
 func (c *Client) Call(ctx context.Context, apiPath string, body map[string]interface{}) (*CallResult, error) {
-	body["key"] = c.cfg.HuaAn.Key
-	if c.cfg.HuaAn.SignEnabled {
-		delete(body, "sign")
-		body["sign"] = sign.Build(body, c.cfg.HuaAn.Key)
-	} else {
+	delete(body, "key")
+	delete(body, "sign")
+	if !c.cfg.HuaAn.SignEnabled {
+		body["key"] = ""
 		body["sign"] = ""
 	}
 
-	upstreamPath := ResolveUpstreamPath(c.cfg.HuaAn.APIPath, apiPath)
+	upstreamPath := c.resolveUpstreamPath(apiPath)
 	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + upstreamPath
 	reqBytes, err := json.Marshal(body)
 	if err != nil {
@@ -70,6 +70,11 @@ func (c *Client) Call(ctx context.Context, apiPath string, body map[string]inter
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	if c.cfg.HuaAn.SignEnabled {
+		req.Header.Set("sign", buildHuaAnSign(apiPath, body, c.cfg.HuaAn.Key))
+	}
+	c.applyCommonChannelHeaders(req, upstreamPath, body)
 
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(start).Milliseconds()
@@ -94,7 +99,25 @@ func (c *Client) Call(ctx context.Context, apiPath string, body map[string]inter
 	return result, nil
 }
 
-// BuildRequestBody 构造带 timestamp、channelCode 的华安请求体（key/sign 由 Call 注入）。
+func (c *Client) applyCommonChannelHeaders(req *http.Request, upstreamPath string, body map[string]interface{}) {
+	if strings.HasPrefix(upstreamPath, "/common/channel/api/") {
+		if cc, ok := body["channelCode"].(string); ok && cc != "" {
+			req.Header.Set("channelCode", cc)
+		}
+		if ts, ok := body["timestamp"].(string); ok && ts != "" {
+			req.Header.Set("timestamp", ts)
+		}
+		return
+	}
+	if !c.useProxyUpstreamPrefix() {
+		return
+	}
+	if cc, ok := body["channelCode"].(string); ok && cc != "" {
+		req.Header.Set("channelCode", cc)
+	}
+}
+
+// BuildRequestBody 构造带 timestamp、channelCode 的华安请求体（sign 由 Call 写入请求头）。
 func BuildRequestBody(channelCode string, fields map[string]interface{}) map[string]interface{} {
 	body := map[string]interface{}{
 		"timestamp":   fmt.Sprintf("%d", time.Now().UnixMilli()),

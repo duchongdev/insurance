@@ -9,10 +9,12 @@ server:
   upstream_timeout: 25s
 
 huaan:
-  # 华安上游域名（务必改为生产/测试真实地址）
+  # 华安上游域名（务必改为生产/测试真实地址；也可在管理后台「华安配置」中修改）
   base_url: https://xx.xxx.api.york.xin
   api_path: /upChannelApi
-  # 请求体 key 字段，默认空字符串
+  # 华安侧渠道编码（管理后台可覆盖；首次启动会写入 huaan_settings 表）
+  channel_code: ""
+  # 华安侧密钥，对应请求体 key 字段
   key: ""
   # true 时按华安规则生成 sign；false 时 sign 传空字符串
   sign_enabled: false
@@ -43,8 +45,5 @@ log:
   max_size_mb: 100
 
 admin:
-  default_username: admin
-  # 首次启动无管理员时创建；登录后请尽快修改密码
-  default_password: 请修改默认管理员密码
   # 开发期 Vue 本地 dev server 跨域，逗号分隔；生产 Nginx 同源部署留空
   cors_origins: ""

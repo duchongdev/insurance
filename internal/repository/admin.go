@@ -32,9 +32,8 @@ func (r *AdminRepo) Create(u *model.AdminUser) error {
 	return r.db.Create(u).Error
 }
 
-// Count 返回管理员总数，用于 seed 判断是否需要初始化默认账号。
-func (r *AdminRepo) Count() (int64, error) {
-	var n int64
-	err := r.db.Model(&model.AdminUser{}).Count(&n).Error
-	return n, err
+// UpdatePasswordHash 更新管理员密码哈希。
+func (r *AdminRepo) UpdatePasswordHash(id uint64, hash string) error {
+	return r.db.Model(&model.AdminUser{}).Where("id = ?", id).Update("password_hash", hash).Error
 }
+
