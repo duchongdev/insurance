@@ -388,41 +388,44 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 | 项 | 值 |
 |----|-----|
 | 路径 | `POST {HUAAN_BASE_URL}/common/channel/api/sms/valid` |
-| 采集时间 | — |
-| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
-| 环境 | `https://ins.api.hahealth.ink/`（计划） |
-| 渠道编码 | 待确认 |
-| 签名 | 待确认 |
+| 采集时间 | 2026-06-25 |
+| 联调状态 | **测试环境已通过**（`http://47.97.156.18:9040`，渠道 `BLtJjF`）；hahealth 待测 |
+| 环境 | `http://47.97.156.18:9040` |
+| 渠道编码 | `BLtJjF` |
+| 签名 | 请求头 `sign`；参与字段 `channelCode`、`phoneNo`、`code`、`timestamp`，末尾标准 `&key=华安密钥`，MD5 大写 |
 
-校验短信验证码；请求手机号字段为 **`mobile`**（非 `phoneNo`）。
+校验短信验证码；请求字段为 **`phoneNo`**（手机号）与 **`code`**（验证码，非 `smsCode`）。
 
 ### 请求体示例
 
 ```json
 {
-  "timestamp": "1717300000000",
-  "channelCode": "YOUR_CHANNEL_CODE",
-  "mobile": "13800138000",
-  "smsCode": "1234",
-  "key": "",
-  "sign": ""
+  "timestamp": "1782703244953",
+  "channelCode": "BLtJjF",
+  "phoneNo": "13811045503",
+  "code": "3875"
 }
+```
+
+### 上游签名示例
+
+```text
+明文: channelCode=BLtJjF&code=3875&phoneNo=13811045503&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
+sign: F13AC45360ED163467F3D48FD11A33BE
 ```
 
 ### 响应体（华安原始 JSON）
 
-> 待测试。文档约定示例：
-
 ```json
 {
   "code": 200,
-  "message": "请求成功",
+  "message": "操作成功",
   "data": {
-    "userId": "xxx",
-    "idCard": "xxx",
-    "name": "xxx",
-    "phoneNo": "xxx",
-    "channelCode": "xxx"
+    "idCard": "13068319940517031X",
+    "name": "杜冲",
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab",
+    "phoneNo": "13811045503",
+    "channelCode": "I7fZcM"
   }
 }
 ```
@@ -431,7 +434,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 
 | 字段 | 层级 | 类型 | 说明 |
 |------|------|------|------|
-| `code` | 根 | integer | `200` 表示成功 |
+| `phoneNo` | 请求 | string | 手机号 |
+| `code` | 请求 | string | 短信验证码 |
+| `code` | 根 | integer | 响应业务码，`200` 表示成功 |
 | `message` | 根 | string | 提示信息 |
 | `data` | 根 | object | 用户信息 |
 | `userId` | data | string | 用户 ID |
@@ -443,10 +448,12 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ### 复现采集
 
 ```bash
-HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
-HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
-HUAAN_TEST_SMS_CODE="1234" \
+HUAAN_BASE_URL="http://47.97.156.18:9040" \
+HUAAN_CHANNEL_CODE="BLtJjF" \
+HUAAN_KEY="fb9ec7236b6c45b7bfd562672e0373ea" \
+HUAAN_SIGN_ENABLED=true \
+HUAAN_TEST_PHONE="13811045503" \
+HUAAN_TEST_SMS_CODE="3875" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsValid'
 ```
 

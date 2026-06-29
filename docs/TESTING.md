@@ -55,7 +55,7 @@ set -a && source .env.huaan && set +a
 | `HUAAN_TEST_PHONE` | 含 PII 接口 | 明文手机号 |
 | `HUAAN_TEST_NAME` | 含 PII 接口 | 明文姓名 |
 | `HUAAN_TEST_ID_CARD` | 含 PII 接口 | 明文身份证号 |
-| `HUAAN_TEST_SMS_CODE` | `sms/valid` | 短信验证码明文 |
+| `HUAAN_TEST_SMS_CODE` | `sms/valid` | 验证码明文（映射为上游 body 字段 `code`） |
 | `HUAAN_TEST_USER_ID` | 否 | 仅当 `proInsurance` 未返回 `userId` 时，`getSignUrl` 测试备用 |
 
 `productCode`、`policyId` **无需配置**：集成测试分别从 `product/info`、`proInsurance` 响应解析（与生产一致——`policyId` 由下游请求携带，本服务只转发）。
@@ -230,7 +230,7 @@ Authorization: Bearer <token>
 |------|----------|----------|--------|----------|------|------|
 | 获取渠道产品信息 | `POST /upChannelApi/product/info` | `POST /common/channel/api/product/info` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 2026-06-25 直连试跑：`code=500`，`message=未授权的访问来源`；待确认该域名下 `channelCode`、IP 白名单及是否须开启签名后统一联调 |
 | 获取用户短信验证码 | `POST /upChannelApi/sms/send` | `POST /common/channel/api/sms/send` | `phoneNo` | `https://ins.api.hahealth.ink/` | **待测试** | 新增接口，待与 product/info 一并联调 |
-| 短信验证码校验 | `POST /upChannelApi/sms/valid` | `POST /common/channel/api/sms/valid` | `mobile` + `smsCode` | `http://47.97.156.18:9040`（测试） | **未完成联调** | 2026-06-25 多方案试签：仅 `channelCode+timestamp+key` 可过验签但业务报 500「参数为空」；含 `mobile`/`smsCode` 或去掉 `key` 后缀均 601；待华安提供官方验签示例后继续 |
+| 短信验证码校验 | `POST /upChannelApi/sms/valid` | `POST /common/channel/api/sms/valid` | `phoneNo` + `code` | `http://47.97.156.18:9040`（已测） / `https://ins.api.hahealth.ink/`（待测） | **部分完成** | 测试环境 `BLtJjF` 直连 200；上游签名为 `channelCode`+`phoneNo`+`code`+`timestamp`+`&key=`；需先 `sms/send` 取得验证码 |
 | 免短信验证码注册登录 | `POST /upChannelApi/sms/noValid` | `POST /common/channel/api/sms/noValid` | `mobile` | `https://ins.api.hahealth.ink/` | **待测试** | 响应 `data` 含三要素须加密；无需 smsCode |
 | 查询产品价格 | `POST /upChannelApi/priceByUser` | `POST /common/channel/api/priceByUser` | `idCard` + 业务字段 | `https://ins.api.hahealth.ink/` | **待测试** | `hasSocialSecurity` 为整数；`productPriceList` 可选 |
 | 查询用户投保情况 | `POST /upChannelApi/policy/phone` | `POST /common/channel/api/policy/phone` | `phoneNo` 或 `userId` | `https://ins.api.hahealth.ink/` | **待测试** | 仅返回基础版；`phoneNo`/`userId` 二选一 |

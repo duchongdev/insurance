@@ -61,7 +61,7 @@ func main() {
 		{name: "getBankList", path: huaan.BankListPath},
 		{name: "productInfo", path: huaan.ProductInfoPath, needPII: true},
 		{name: "smsSend", path: huaan.SmsSendPath, needPII: true},
-		{name: "smsValid", path: huaan.SmsValidPath, needMobile: true, fields: map[string]interface{}{"smsCode": smsCode}},
+		{name: "smsValid", path: huaan.SmsValidPath, needPhoneOrUser: true, fields: map[string]interface{}{"code": smsCode}},
 		{name: "smsNoValid", path: huaan.SmsNoValidPath, needMobile: true},
 		{name: "priceByUser", path: huaan.PriceByUserPath, needIdCard: true, fields: map[string]interface{}{
 			"productCode": productCode, "hasSocialSecurity": 1,

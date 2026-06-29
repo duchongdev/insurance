@@ -24,11 +24,11 @@ func TestSmsSignExcludeKeys(t *testing.T) {
 		},
 		{
 			path: SmsValidPath,
-			body: mergeMaps(base, map[string]interface{}{"mobile": "13811045503", "smsCode": "1234"}),
+			body: mergeMaps(base, map[string]interface{}{"phoneNo": "13811045503", "code": "1234"}),
 			wantSign: sign.BuildHuaAn(mergeMaps(base, map[string]interface{}{
-				"mobile":  "13811045503",
-				"smsCode": "1234",
-			}), ""),
+				"phoneNo": "13811045503",
+				"code":    "1234",
+			}), key),
 		},
 		{
 			path: SmsSendPath,

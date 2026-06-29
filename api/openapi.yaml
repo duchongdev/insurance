@@ -4,7 +4,7 @@ info:
   description: |
     渠道商调用本服务，本服务验签、解密三要素后转发华安，并将华安响应原样返回（三要素字段加密）。
     管理后台 API 需 Bearer Token。
-  version: 1.15.0
+  version: 1.16.0
 servers:
   - url: http://localhost
   - url: https://localhost
@@ -234,8 +234,9 @@ paths:
       tags: [渠道接口]
       summary: 短信验证码校验
       description: |
-        校验手机号与短信验证码；转发华安 /common/channel/api/sms/valid。
-        **联调状态：未完成联调**（华安验签规则待确认，见 docs/TESTING.md §7）。
+        校验手机号与短信验证码；转发华安 `POST /common/channel/api/sms/valid`。
+        请求体字段为 `phoneNo`（手机号，须加密/明文与渠道 `piiEncrypted` 一致）与 `code`（验证码明文）。
+        本服务转发华安时按上游规则计算请求头 `sign`（参与字段：`channelCode`、`phoneNo`、`code`、`timestamp`，末尾标准 `&key=华安密钥`，MD5 大写）。
       requestBody:
         required: true
         content:
@@ -244,14 +245,14 @@ paths:
               allOf:
                 - $ref: '#/components/schemas/SignedRequest'
                 - type: object
-                  required: [mobile, smsCode]
+                  required: [phoneNo, code]
                   properties:
-                    mobile:
+                    phoneNo:
                       type: string
-                      description: 手机号（须加密，对应华安 mobile 字段）
-                    smsCode:
+                      description: 手机号（须加密，对应华安 phoneNo 字段）
+                    code:
                       type: string
-                      description: 短信验证码（明文）
+                      description: 短信验证码（明文，对应华安 code 字段）
       responses:
         '200':
           description: 华安标准响应

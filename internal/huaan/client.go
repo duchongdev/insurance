@@ -56,6 +56,9 @@ func (c *Client) Call(ctx context.Context, apiPath string, body map[string]inter
 		body["key"] = ""
 		body["sign"] = ""
 	}
+	if apiPath == SmsValidPath {
+		normalizeSmsValidUpstreamBody(body)
+	}
 
 	upstreamPath := c.resolveUpstreamPath(apiPath)
 	upstreamURL := strings.TrimRight(c.cfg.HuaAn.BaseURL, "/") + upstreamPath

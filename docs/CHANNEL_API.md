@@ -444,8 +444,6 @@ flowchart LR
 
 ### 6.5 sms/valid — 短信验证码校验
 
-**联调状态**：**未完成联调**（华安上游验签规则未确认；bridge 已注册路由并转发，集成测试默认 Skip，见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)）。
-
 **路径**：`POST /upChannelApi/sms/valid`（本服务转发华安 `POST /common/channel/api/sms/valid`）
 
 校验手机号与短信验证码，成功时返回用户信息。
@@ -456,8 +454,8 @@ flowchart LR
 | 字段        | 必填  | 说明            |
 | --------- | --- | ------------- |
 | 公共字段      | 是   | 见 2.2         |
-| `mobile`  | 是   | 手机号，须加密/明文与渠道 `piiEncrypted` 一致（华安字段名为 `mobile`） |
-| `smsCode` | 是   | 短信验证码，明文      |
+| `phoneNo` | 是   | 手机号，须加密/明文与渠道 `piiEncrypted` 一致（华安上游字段名为 `phoneNo`） |
+| `code`    | 是   | 短信验证码，明文（华安上游字段名为 `code`，非 `smsCode`） |
 
 
 #### 请求示例
@@ -467,10 +465,26 @@ flowchart LR
   "timestamp": "1780402912568",
   "channelCode": "YOUR_CHANNEL_CODE",
   "key": "YOUR_CHANNEL_KEY",
-  "mobile": "AES-GCM-Base64-密文或明文",
-  "smsCode": "1234",
+  "phoneNo": "AES-GCM-Base64-密文或明文",
+  "code": "1234",
   "sign": "421fbad02166ea2479f270c434b08168"
 }
+```
+
+> **兼容说明**：本服务转发华安前会将旧字段 `mobile` → `phoneNo`、`smsCode` → `code` 自动映射；新接入请直接使用 `phoneNo` 与 `code`。
+
+#### 华安上游签名（本服务 → 华安，`sign_enabled=true`）
+
+`sign` 写入 HTTP 请求头（body 不含 `key`/`sign`）。参与签名的 body 字段：
+
+- `channelCode`、`phoneNo`、`code`、`timestamp`
+- 明文末尾标准拼接 `&key={华安渠道密钥}`，MD5 后 32 位大写
+
+示例（`phoneNo=13811045503`，`code=3875`）：
+
+```text
+channelCode=BLtJjF&code=3875&phoneNo=13811045503&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
+→ sign=F13AC45360ED163467F3D48FD11A33BE
 ```
 
 #### 响应示例

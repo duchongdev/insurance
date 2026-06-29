@@ -46,10 +46,10 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 			fields:  nil,
 		},
 		{
-			name:       "smsValid",
-			path:       huaan.SmsValidPath,
-			fields:     map[string]interface{}{"smsCode": os.Getenv("HUAAN_TEST_SMS_CODE")},
-			needMobile: true,
+			name:            "smsValid",
+			path:            huaan.SmsValidPath,
+			needPhoneOrUser: true,
+			fields:          map[string]interface{}{"code": os.Getenv("HUAAN_TEST_SMS_CODE")},
 		},
 		{
 			name:       "smsNoValid",
@@ -89,9 +89,6 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.path == huaan.SmsValidPath {
-				t.Skip("跳过：sms/valid 未完成联调，华安验签规则待确认")
-			}
 			fields := tc.fields
 			if tc.needPII {
 				if env.Phone == "" || env.Name == "" || env.IDCard == "" {
@@ -142,6 +139,18 @@ func TestHuaAnDirect_AllPaths(t *testing.T) {
 					fields["userId"] = uid
 				} else {
 					t.Skip("跳过：请设置 HUAAN_TEST_PHONE 或 HUAAN_TEST_USER_ID")
+				}
+			}
+			if tc.fields != nil {
+				if _, ok := tc.fields["code"]; ok {
+					if fields == nil {
+						fields = map[string]interface{}{}
+					}
+					code, _ := tc.fields["code"].(string)
+					if code == "" {
+						t.Skip("跳过：请设置 HUAAN_TEST_SMS_CODE")
+					}
+					fields["code"] = code
 				}
 			}
 
@@ -362,7 +371,7 @@ func TestHuaAnDirect_APIPathsComplete(t *testing.T) {
 		huaan.BankListPath:               true,
 		huaan.ProductInfoPath:            true, // TestHuaAnDirect_AllPaths/productInfo
 		huaan.SmsSendPath:                true, // TestHuaAnDirect_AllPaths/smsSend
-		huaan.SmsValidPath:               true, // TestHuaAnDirect_AllPaths/smsValid（当前 Skip：未完成联调）
+		huaan.SmsValidPath:               true, // TestHuaAnDirect_AllPaths/smsValid
 		huaan.SmsNoValidPath:             true, // TestHuaAnDirect_AllPaths/smsNoValid
 		huaan.PriceByUserPath:            true, // TestHuaAnDirect_AllPaths/priceByUser
 		huaan.PolicyByPhonePath:          true, // TestHuaAnDirect_AllPaths/policyByPhone

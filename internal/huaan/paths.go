@@ -30,7 +30,6 @@ const SmsSendPath = "/sms/send"
 const SmsSendUpstreamPath = "/common/channel/api/sms/send"
 
 // SmsValidPath 渠道侧短信验证码校验路径（挂载在 huaan.api_path 路由组下）。
-// 联调状态：未完成联调（华安上游验签/参数绑定规则待确认，见 docs/TESTING.md §7）。
 const SmsValidPath = "/sms/valid"
 
 // SmsValidUpstreamPath 华安侧短信验证码校验路径（相对 base_url，非 /upChannelApi 前缀）。

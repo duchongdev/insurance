@@ -269,8 +269,8 @@ func main() {
 		appendResult(r)
 		if smsCode != "" {
 			r = call("sms/valid", huaan.SmsValidPath, "sms/send", map[string]interface{}{
-				"mobile": phone, "smsCode": smsCode,
-			}, "smsCode 明文", hahealth)
+				"phoneNo": phone, "code": smsCode,
+			}, "code 明文", hahealth)
 			appendResult(r)
 		}
 	}

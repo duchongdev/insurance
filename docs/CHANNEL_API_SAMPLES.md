@@ -48,7 +48,7 @@ Content-Type: application/json; charset=utf-8
 | getProductInfoByChannel | `/upChannelApi/getProductInfoByChannel` | 否 | 待采集 |
 | product/info | `/upChannelApi/product/info` | 是 | **待测试** |
 | sms/send | `/upChannelApi/sms/send` | 是 | **待测试** |
-| sms/valid | `/upChannelApi/sms/valid` | 是 | **待测试** |
+| sms/valid | `/upChannelApi/sms/valid` | 是 | **测试环境已通过** |
 | sms/noValid | `/upChannelApi/sms/noValid` | 是 | **待测试** |
 | priceByUser | `/upChannelApi/priceByUser` | 是 | **待测试** |
 | policy/phone | `/upChannelApi/policy/phone` | 是 | **待测试** |
@@ -220,24 +220,35 @@ curl -sS -X POST 'http://localhost/upChannelApi/getBankList' \
 |----|-----|
 | 路径 | `POST {平台域名}/upChannelApi/sms/valid` |
 | 华安路径 | `POST {HUAAN_BASE_URL}/common/channel/api/sms/valid` |
-| 采集时间 | — |
-| 联调状态 | **待测试**（见 [TESTING.md §7](./TESTING.md#7-待测试接口列表)） |
+| 采集时间 | 2026-06-25 |
+| 联调状态 | **测试环境已通过**（见 [HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验](./HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验)） |
 | 对照华安样例 | [HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验](./HUAAN_API_SAMPLES.md#smsvalid--短信验证码校验) |
 
 ### 请求体（渠道 → 本服务）
 
-> 待测试。须带公共字段 + `mobile`（加密）+ `smsCode`（明文）。
+须带公共字段 + `phoneNo`（加密/明文与 `piiEncrypted` 一致）+ `code`（验证码明文）。
+
+```json
+{
+  "timestamp": "1780402912568",
+  "channelCode": "YOUR_CHANNEL_CODE",
+  "key": "YOUR_CHANNEL_KEY",
+  "phoneNo": "AES-GCM-Base64-密文或明文",
+  "code": "3875",
+  "sign": "渠道 sign（MD5 小写，含 key）"
+}
+```
 
 ### 响应体（本服务 → 渠道）
 
-> 待测试。预期 `data` 含 `userId`、`idCard`、`name`、`phoneNo`、`channelCode`（三要素字段为密文）。
+`data` 含 `userId`、`idCard`、`name`、`phoneNo`、`channelCode`（三要素字段为密文，当 `piiEncrypted=true`）。
 
 ### 与华安原文对照
 
 | 差异点 | 渠道侧 | 华安原文 |
 |--------|--------|----------|
-| 签名 | 渠道密钥 | 华安密钥或空 |
-| 手机号字段 | 请求 `mobile` 须加密 | 明文 `mobile` |
+| 签名 | 渠道密钥（body 含 `key`/`sign`） | 华安密钥；`sign` 在请求头；参与字段含 `phoneNo`、`code` |
+| 手机号/验证码字段 | `phoneNo`、`code` | 同左（旧文档 `mobile`/`smsCode` 已废弃） |
 | 三要素响应 | `data` 内 PII 须加密 | 明文 |
 | 上游路径 | 本服务 `/upChannelApi/sms/valid` | `/common/channel/api/sms/valid` |
 

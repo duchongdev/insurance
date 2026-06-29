@@ -180,7 +180,7 @@ flowchart TD
 | getPolicyInfoByPhoneNo | 是（phoneNo） | 是 |
 | product/info | 是（phoneNo） | 否 |
 | sms/send | 是（phoneNo） | 否 |
-| sms/valid | 是（mobile） | 是（phoneNo、name、idCard） |
+| sms/valid | 是（phoneNo） | 是（phoneNo、name、idCard） |
 | sms/noValid | 是（mobile） | 是（phoneNo、name、idCard） |
 | priceByUser | 是（idCard） | 否 |
 | policy/phone | 是（phoneNo，与 userId 二选一） | 是（data[]、insuredList 等） |

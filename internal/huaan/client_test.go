@@ -171,8 +171,8 @@ func TestClient_Call_SmsValidUpstreamPath(t *testing.T) {
 	client := NewClient(cfg, nil, srv.Client())
 
 	body := BuildRequestBody("CH001", map[string]interface{}{
-		"mobile":  "13333333333",
-		"smsCode": "1234",
+		"phoneNo": "13333333333",
+		"code":    "1234",
 	})
 	if _, err := client.Call(t.Context(), SmsValidPath, body); err != nil {
 		t.Fatal(err)

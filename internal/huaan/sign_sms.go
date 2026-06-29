@@ -15,6 +15,9 @@ func SmsSignExcludeKeys(apiPath string) []string {
 }
 
 func bodyForHuaAnSign(apiPath string, body map[string]interface{}) map[string]interface{} {
+	if apiPath == SmsValidPath {
+		return smsValidSignParams(body)
+	}
 	exclude := SmsSignExcludeKeys(apiPath)
 	if len(exclude) == 0 {
 		return body
@@ -33,12 +36,35 @@ func bodyForHuaAnSign(apiPath string, body map[string]interface{}) map[string]in
 	return out
 }
 
-// huaanSignSecretKey 返回参与华安签名的密钥；空字符串表示明文末尾不拼接 &key=。
-// SmsValidPath：临时规则（mobile+smsCode 参与签名、不含 key 后缀），未完成联调，后续可能调整。
-func huaanSignSecretKey(apiPath string, secretKey string) string {
-	if apiPath == SmsValidPath {
-		return ""
+// smsValidSignParams 构造 sms/valid 签名参数字段：phoneNo、code 及公共字段。
+func smsValidSignParams(body map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for _, k := range []string{"channelCode", "timestamp", "phoneNo", "code"} {
+		if v, ok := body[k]; ok {
+			out[k] = v
+		}
 	}
+	return out
+}
+
+// normalizeSmsValidUpstreamBody 华安 sms/valid 上游字段：phoneNo、code（兼容旧 mobile、smsCode）。
+func normalizeSmsValidUpstreamBody(body map[string]interface{}) {
+	if v, ok := body["mobile"]; ok {
+		if phone, has := body["phoneNo"].(string); !has || phone == "" {
+			body["phoneNo"] = v
+		}
+		delete(body, "mobile")
+	}
+	if v, ok := body["smsCode"]; ok {
+		if code, has := body["code"].(string); !has || code == "" {
+			body["code"] = v
+		}
+		delete(body, "smsCode")
+	}
+}
+
+// huaanSignSecretKey 返回参与华安签名的密钥。
+func huaanSignSecretKey(apiPath string, secretKey string) string {
 	return secretKey
 }
 
