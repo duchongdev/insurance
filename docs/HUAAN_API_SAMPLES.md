@@ -277,7 +277,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
-  "phoneNo": "13800138000",
+  "phoneNo": "***",
   "key": "",
   "sign": ""
 }
@@ -321,7 +321,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ```bash
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_PHONE="***" \
 HUAAN_TEST_NAME="张三" \
 HUAAN_TEST_ID_CARD="110101199001011234" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/productInfo'
@@ -346,7 +346,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
-  "phoneNo": "13800138000",
+  "phoneNo": "***",
   "key": "",
   "sign": ""
 }
@@ -377,7 +377,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ```bash
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_PHONE="***" \
 HUAAN_TEST_NAME="张三" \
 HUAAN_TEST_ID_CARD="110101199001011234" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsSend'
@@ -402,7 +402,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1782703244953",
   "channelCode": "BLtJjF",
-  "phoneNo": "13811045503",
+  "phoneNo": "***",
   "code": "3875"
 }
 ```
@@ -410,7 +410,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ### 上游签名示例
 
 ```text
-明文: channelCode=BLtJjF&code=3875&phoneNo=13811045503&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
+明文: channelCode=BLtJjF&code=3875&phoneNo=***&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
 sign: F13AC45360ED163467F3D48FD11A33BE
 ```
 
@@ -421,10 +421,10 @@ sign: F13AC45360ED163467F3D48FD11A33BE
   "code": 200,
   "message": "操作成功",
   "data": {
-    "idCard": "13068319940517031X",
-    "name": "杜冲",
+    "idCard": "***",
+    "name": "***",
     "userId": "5c819c252ab343e2a2a6df98b3a014ab",
-    "phoneNo": "13811045503",
+    "phoneNo": "***",
     "channelCode": "I7fZcM"
   }
 }
@@ -452,7 +452,7 @@ HUAAN_BASE_URL="http://47.97.156.18:9040" \
 HUAAN_CHANNEL_CODE="BLtJjF" \
 HUAAN_KEY="fb9ec7236b6c45b7bfd562672e0373ea" \
 HUAAN_SIGN_ENABLED=true \
-HUAAN_TEST_PHONE="13811045503" \
+HUAAN_TEST_PHONE="***" \
 HUAAN_TEST_SMS_CODE="3875" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsValid'
 ```
@@ -476,7 +476,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
-  "mobile": "13800138000",
+  "mobile": "***",
   "key": "",
   "sign": ""
 }
@@ -505,7 +505,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ```bash
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_PHONE="***" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/smsNoValid'
 ```
 
@@ -529,7 +529,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
   "productCode": "PROD2025001",
-  "idCard": "110101199003071234",
+  "idCard": "***",
   "hasSocialSecurity": 1,
   "productPriceList": [
     {
@@ -571,7 +571,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
 HUAAN_TEST_PRODUCT_CODE="PROD2025001" \
-HUAAN_TEST_ID_CARD="110101199003071234" \
+HUAAN_TEST_ID_CARD="***" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/priceByUser'
 ```
 
@@ -593,7 +593,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
-  "phoneNo": "13800138000",
+  "phoneNo": "***",
   "key": "",
   "sign": ""
 }
@@ -628,7 +628,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ```bash
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_PHONE="***" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/policyByPhone'
 ```
 
@@ -649,7 +649,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 {
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
-  "phoneNo": "13800138000",
+  "phoneNo": "***",
   "key": "",
   "sign": ""
 }
@@ -701,7 +701,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 ```bash
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
-HUAAN_TEST_PHONE="13800138000" \
+HUAAN_TEST_PHONE="***" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/getUserInfoByPhoneNo'
 ```
 
@@ -721,7 +721,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "timestamp": "1717300000000",
   "channelCode": "YOUR_CHANNEL_CODE",
   "productCode": "PROD2025001",
-  "idCard": "110101199003071234",
+  "idCard": "***",
   "hasSocialSecurity": 1,
   "productType": 1,
   "key": "",
@@ -760,7 +760,7 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 HUAAN_BASE_URL="https://ins.api.hahealth.ink/" \
 HUAAN_CHANNEL_CODE="你的渠道编码" \
 HUAAN_TEST_PRODUCT_CODE="PROD2025001" \
-HUAAN_TEST_ID_CARD="110101199003071234" \
+HUAAN_TEST_ID_CARD="***" \
 go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_AllPaths/liabilitiesByProductId'
 ```
 
@@ -785,9 +785,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "key": "",
   "sign": "",
   "productCode": "ZFHLW1041001",
-  "phoneNo": "13811045503",
-  "name": "杜冲",
-  "idCard": "13068319940517031X",
+  "phoneNo": "***",
+  "name": "***",
+  "idCard": "***",
   "hasSocialSecurity": 1,
   "isUpgrade": 0,
   "autoRenew": 1,
@@ -805,9 +805,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 | 请求字段 | 实测值（示例） | 说明 |
 |----------|----------------|------|
 | `productCode` | `ZFHLW1041001` / `ZFHLW1040003` | 来自 getProductInfoByChannel |
-| `phoneNo` | `13811045503` | 明文（直连华安；经本服务转发时须 AES 密文） |
-| `name` | `杜冲` | 同上 |
-| `idCard` | `13068319940517031X` | 同上 |
+| `phoneNo` | `***` | 明文（直连华安；经本服务转发时须 AES 密文） |
+| `name` | `***` | 同上 |
+| `idCard` | `***` | 同上 |
 | `hasSocialSecurity` | `1` | 是否有社保（**整数**） |
 | `isUpgrade` | `0` | 是否升级：1 升级，0 不升级 |
 | `autoRenew` | `1` | 是否次年自动续保 |
@@ -881,9 +881,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 
 ```bash
 set -a && source .env.huaan && set +a
-export HUAAN_TEST_PHONE="13811045503"
-export HUAAN_TEST_NAME="杜冲"
-export HUAAN_TEST_ID_CARD="13068319940517031X"
+export HUAAN_TEST_PHONE="***"
+export HUAAN_TEST_NAME="***"
+export HUAAN_TEST_ID_CARD="***"
 
 go test -tags=integration ./internal/huaan/ -v -count=1 \
   -run 'TestHuaAnDirect_ProductFromChannel/ZFHLW1041001/proInsurance'
@@ -1086,9 +1086,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
   "key": "",
   "sign": "",
   "productCode": "ZFHLW1041001",
-  "phoneNo": "13811045503",
-  "name": "杜冲",
-  "idCard": "13068319940517031X",
+  "phoneNo": "***",
+  "name": "***",
+  "idCard": "***",
   "hasSocialSecurity": "1"
 }
 ```
@@ -1096,9 +1096,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 | 请求字段 | 实测值（示例） | 说明 |
 |----------|----------------|------|
 | `productCode` | `ZFHLW1041001` / `ZFHLW1040003` | 来自 getProductInfoByChannel |
-| `phoneNo` | `13811045503` | 明文（直连华安；经本服务转发时须 AES 密文） |
-| `name` | `杜冲` | 同上 |
-| `idCard` | `13068319940517031X` | 同上 |
+| `phoneNo` | `***` | 明文（直连华安；经本服务转发时须 AES 密文） |
+| `name` | `***` | 同上 |
+| `idCard` | `***` | 同上 |
 | `hasSocialSecurity` | `"1"` | 是否有社保；未传时华安可能报「未找到价格规则… hasSocialSecurity=null」 |
 
 ### 仅 productCode 时的响应（失败）
@@ -1180,9 +1180,9 @@ go test -tags=integration ./internal/huaan/ -v -count=1 -run 'TestHuaAnDirect_Al
 
 ```bash
 set -a && source .env.huaan && set +a
-export HUAAN_TEST_PHONE="13811045503"
-export HUAAN_TEST_NAME="杜冲"
-export HUAAN_TEST_ID_CARD="13068319940517031X"
+export HUAAN_TEST_PHONE="***"
+export HUAAN_TEST_NAME="***"
+export HUAAN_TEST_ID_CARD="***"
 
 go test -tags=integration ./internal/huaan/ -v -count=1 \
   -run 'TestHuaAnDirect_ProductFromChannel/ZFHLW1041001/getProductPricesByProductCode'

@@ -1,6 +1,6 @@
-# 华安侧接口请求与响应 [test]
+# 华安侧接口请求与响应[test]
 
-本文档记录**测试环境** `http://47.97.156.18:9040` 直连华安实测（不经渠道验签、三要素**明文**）。
+本文档记录在本机通过 `huaan.Client` 逻辑**直连华安**（不经渠道验签、三要素**明文**）的实测结果。文档中手机号、姓名、身份证号等**用户三要素**均以 `***` 脱敏展示。
 
 ## 测试环境
 
@@ -8,29 +8,13 @@
 |----|-----|
 | 华安地址 | `http://47.97.156.18:9040` |
 | 渠道编码 | `BLtJjF` |
-| 测试时间 | 2026-06-26T17:42:19+08:00 |
-| 签名 | **开启**（HTTP 头 `sign`，MD5 大写；密钥不写 body） |
-| 请求头 | `/common/channel/api/*` 须附加 `channelCode`、`timestamp`（与 body 一致） |
-| 路径 | legacy `/upChannelApi/*` 走 `/proxy/upChannelApi/*` |
-| 参数来源 | `productCode` ← **product/info**；`bankCode`/`payChannelId` ← **getBankList** |
-| 不测 | sms 系列；**已废弃**：getProductInfoByChannel、verifyNoCode、getPolicyInfoByPhoneNo、upGradeIns |
+| 测试时间 | 2026-07-06T15:53:02+08:00 |
+| 签名 | **开启**（`HUAAN_SIGN_ENABLED=true`） |
+| 签名规则 | 非空参数按 key 字典序 `k=v&` 拼接，末尾 `&key=渠道密钥`，MD5 **大写** 32 位；写入 HTTP 头 `sign`；**密钥不写 body** |
+| 参数来源 | `productCode` ← **product/info**；`bankCode`/`payChannelId` ← **getBankList**；`policyId`/`userId` ← **proInsurance** |
+| 探测脚本 | `go run ./scripts/huaan_direct_probe/main.go`（`HUAAN_PROBE_SKIP_SMS=false`） |
 
-> 第一套渠道 `adD9Ft` 在本环境报「渠道不存在」；**第二套 `BLtJjF` 联调通过**（见下文）。
-
-## 接口依赖与调用顺序
-
-```mermaid
-flowchart TD
-  BL[getBankList] --> PI[product/info]
-  PI --> PP[getProductPricesByProductCode]
-  PI --> PU[priceByUser]
-  PI --> GL[getLiabilitiesByProductId]
-  PI --> PR[proInsurance]
-  PR --> GP[getPolicyInfoByPolicyId]
-  PR --> GPP[getProductPricesByPolicyId]
-  BL --> SU[getSignUrl]
-  PR --> SU
-```
+三要素测试账号（文档脱敏为 `***`）：手机号、姓名、身份证号来自 `HUAAN_TEST_*` 环境变量。
 
 ## 接口明细
 
@@ -41,19 +25,17 @@ flowchart TD
 | 渠道路径 | `POST /upChannelApi/getBankList` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getBankList` |
 | 业务码 | `200` |
-| 耗时 | 130 ms |
+| 耗时 | 133 ms |
 | 说明 | 无业务参数；bankCode/payChannelId 取自本接口 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
   "channelCode": "BLtJjF",
-  "timestamp": "1782466939939"
+  "timestamp": "1783324382058"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -224,7 +206,7 @@ flowchart TD
     },
     {
       "bankName": "民生银行",
-      "bankCode": "CMBCHINA",
+      "bankCode": "CMBC",
       "debitCard": "1",
       "creditCard": "0",
       "sortOrder": 19,
@@ -246,7 +228,7 @@ flowchart TD
 | 耗时 | 93 ms |
 | 说明 | 三要素明文；productCode 取自本接口 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -254,11 +236,9 @@ flowchart TD
   "idCard": "***",
   "name": "***",
   "phoneNo": "***",
-  "timestamp": "1782466940072"
+  "timestamp": "1783324382192"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -279,95 +259,25 @@ flowchart TD
 }
 ```
 
-### 3. verifyNoCode — 失败
-
-| 项 | 值 |
-|----|-----|
-| 渠道路径 | `POST /upChannelApi/verifyNoCode` |
-| 华安路径 | `POST http://47.97.156.18:9040/upChannelApi/verifyNoCode` |
-| 业务码 | `601` |
-| 耗时 | 48 ms |
-| 说明 | 三要素明文 |
-
-**请求体**：
-
-```json
-{
-  "channelCode": "BLtJjF",
-  "idCard": "***",
-  "name": "***",
-  "phoneNo": "***",
-  "timestamp": "1782466940168"
-}
-```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
-
-**响应体**：
-
-```json
-{
-  "code": 601,
-  "message": null,
-  "data": null
-}
-```
-
-### 4. getPolicyInfoByPhoneNo — 失败
-
-| 项 | 值 |
-|----|-----|
-| 渠道路径 | `POST /upChannelApi/getPolicyInfoByPhoneNo` |
-| 华安路径 | `POST http://47.97.156.18:9040/upChannelApi/getPolicyInfoByPhoneNo` |
-| 业务码 | `601` |
-| 耗时 | 48 ms |
-| 说明 | 三要素明文 |
-
-**请求体**：
-
-```json
-{
-  "channelCode": "BLtJjF",
-  "idCard": "***",
-  "name": "***",
-  "phoneNo": "***",
-  "timestamp": "1782466940221"
-}
-```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
-
-**响应体**：
-
-```json
-{
-  "code": 601,
-  "message": null,
-  "data": null
-}
-```
-
-### 5. getUserInfoByPhoneNo — 成功
+### 3. getUserInfoByPhoneNo — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getUserInfoByPhoneNo` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getUserInfoByPhoneNo` |
 | 业务码 | `200` |
-| 耗时 | 115 ms |
+| 耗时 | 90 ms |
 | 说明 | phoneNo 明文 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
   "channelCode": "BLtJjF",
   "phoneNo": "***",
-  "timestamp": "1782466940269"
+  "timestamp": "1783324382287"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -378,33 +288,31 @@ flowchart TD
   "data": {
     "idCard": "***",
     "name": "***",
-    "userId": "***",
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab",
     "phoneNo": "***"
   }
 }
 ```
 
-### 6. policy/phone — 成功
+### 4. policy/phone — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/policy/phone` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/policy/phone` |
 | 业务码 | `200` |
-| 耗时 | 162 ms |
+| 耗时 | 131 ms |
 | 说明 | phoneNo 明文 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
   "channelCode": "BLtJjF",
   "phoneNo": "***",
-  "timestamp": "1782466940385"
+  "timestamp": "1783324382380"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -439,18 +347,18 @@ flowchart TD
 }
 ```
 
-### 7. getProductPricesByProductCode — 成功
+### 5. getProductPricesByProductCode — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getProductPricesByProductCode` |
 | 华安路径 | `POST http://47.97.156.18:9040/upChannelApi/getProductPricesByProductCode` |
-| 参数依赖 | product/info → productCode=HuaAnBao |
+| 依赖 | product/info → productCode=HuaAnBao |
 | 业务码 | `200` |
-| 耗时 | 1593 ms |
+| 耗时 | 153 ms |
 | 说明 | hasSocialSecurity 为字符串；含三要素 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -460,11 +368,9 @@ flowchart TD
   "name": "***",
   "phoneNo": "***",
   "productCode": "HuaAnBao",
-  "timestamp": "1782466940549"
+  "timestamp": "1783324382515"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -491,18 +397,18 @@ flowchart TD
 }
 ```
 
-### 8. priceByUser — 成功
+### 6. priceByUser — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/priceByUser` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/priceByUser` |
-| 参数依赖 | product/info → productCode=HuaAnBao |
+| 依赖 | product/info → productCode=HuaAnBao |
 | 业务码 | `200` |
-| 耗时 | 166 ms |
+| 耗时 | 118 ms |
 | 说明 | hasSocialSecurity 为整数 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -510,11 +416,9 @@ flowchart TD
   "hasSocialSecurity": 1,
   "idCard": "***",
   "productCode": "HuaAnBao",
-  "timestamp": "1782466942152"
+  "timestamp": "1783324382670"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -547,18 +451,18 @@ flowchart TD
 }
 ```
 
-### 9. getLiabilitiesByProductId — 成功
+### 7. getLiabilitiesByProductId — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getLiabilitiesByProductId` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getLiabilitiesByProductId` |
-| 参数依赖 | product/info → productCode=HuaAnBao |
+| 依赖 | product/info → productCode=HuaAnBao |
 | 业务码 | `200` |
-| 耗时 | 113 ms |
+| 耗时 | 104 ms |
 | 说明 | productType 1=体验版 |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -567,11 +471,9 @@ flowchart TD
   "idCard": "***",
   "productCode": "HuaAnBao",
   "productType": 1,
-  "timestamp": "1782466942327"
+  "timestamp": "1783324382794"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -583,18 +485,18 @@ flowchart TD
 }
 ```
 
-### 10. proInsurance — 成功
+### 8. proInsurance — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/proInsurance` |
 | 华安路径 | `POST http://47.97.156.18:9040/proxy/upChannelApi/proInsurance` |
-| 参数依赖 | product/info → productCode=HuaAnBao |
+| 依赖 | product/info → productCode=HuaAnBao |
 | 业务码 | `200` |
-| 耗时 | 949 ms |
+| 耗时 | 536 ms |
 | 说明 | 成功时返回 policyId/userId |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -606,11 +508,9 @@ flowchart TD
   "name": "***",
   "phoneNo": "***",
   "productCode": "HuaAnBao",
-  "timestamp": "1782466942442"
+  "timestamp": "1783324382899"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -619,35 +519,33 @@ flowchart TD
   "code": 200,
   "message": "操作成功",
   "data": {
-    "policyId": "eae53555f376407bb5b179e992a85029",
+    "policyId": "790ebf3612a343e18e2c6b0793560b3e",
     "policyStatus": "0",
-    "userId": "***"
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab"
   }
 }
 ```
 
-### 11. getPolicyInfoByPolicyId — 成功
+### 9. getPolicyInfoByPolicyId — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getPolicyInfoByPolicyId` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getPolicyInfoByPolicyId` |
-| 参数依赖 | proInsurance → policyId=eae53555f376407bb5b179e992a85029 |
+| 依赖 | proInsurance → policyId=790ebf3612a343e18e2c6b0793560b3e |
 | 业务码 | `200` |
-| 耗时 | 133 ms |
+| 耗时 | 123 ms |
 | 说明 | 仅需 policyId |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
   "channelCode": "BLtJjF",
-  "policyId": "eae53555f376407bb5b179e992a85029",
-  "timestamp": "1782466943391"
+  "policyId": "790ebf3612a343e18e2c6b0793560b3e",
+  "timestamp": "1783324383444"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -658,9 +556,9 @@ flowchart TD
   "data": {
     "insuredList": [
       {
-        "insuredCardNo": "13068319940517031X",
+        "insuredCardNo": "***",
         "hasSocialSecurity": "1",
-        "insuredName": "杜冲",
+        "insuredName": "***",
         "phoneNo": "***"
       }
     ],
@@ -668,13 +566,13 @@ flowchart TD
     "productId": "859db15daa024f43bde30eab9b5f5da2",
     "idCard": "***",
     "hasSocialSecurity": "1",
-    "policyEndDate": "2026-07-26",
-    "policyStartDate": "2026-06-27",
+    "policyEndDate": "2026-08-06",
+    "policyStartDate": "2026-07-07",
     "policyStatus": "0",
     "productName": "百万医疗-体验版",
     "phoneNo": "***",
     "productCode": "HuaAnBao",
-    "policyId": "eae53555f376407bb5b179e992a85029",
+    "policyId": "790ebf3612a343e18e2c6b0793560b3e",
     "payPremium": 0.6,
     "riskList": [
       {
@@ -682,35 +580,33 @@ flowchart TD
         "riskCode": null
       }
     ],
-    "createTime": "2026-06-26",
+    "createTime": "2026-07-06",
     "name": "***",
     "autoRenew": "1"
   }
 }
 ```
 
-### 12. getProductPricesByPolicyId — 成功
+### 10. getProductPricesByPolicyId — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getProductPricesByPolicyId` |
 | 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getProductPricesByPolicyId` |
-| 参数依赖 | proInsurance → policyId=eae53555f376407bb5b179e992a85029 |
+| 依赖 | proInsurance → policyId=790ebf3612a343e18e2c6b0793560b3e |
 | 业务码 | `200` |
-| 耗时 | 119 ms |
+| 耗时 | 115 ms |
 | 说明 | 仅需 policyId |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
   "channelCode": "BLtJjF",
-  "policyId": "eae53555f376407bb5b179e992a85029",
-  "timestamp": "1782466943526"
+  "policyId": "790ebf3612a343e18e2c6b0793560b3e",
+  "timestamp": "1783324383570"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -727,51 +623,18 @@ flowchart TD
 }
 ```
 
-### 13. upGradeIns — 失败
-
-| 项 | 值 |
-|----|-----|
-| 渠道路径 | `POST /upChannelApi/upGradeIns` |
-| 华安路径 | `POST http://47.97.156.18:9040/upChannelApi/upGradeIns` |
-| 参数依赖 | proInsurance → policyId=eae53555f376407bb5b179e992a85029 |
-| 业务码 | `500` |
-| 耗时 | 36 ms |
-| 说明 | 仅需 policyId |
-
-**请求体**：
-
-```json
-{
-  "channelCode": "BLtJjF",
-  "policyId": "eae53555f376407bb5b179e992a85029",
-  "timestamp": "1782466943650"
-}
-```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
-
-**响应体**：
-
-```json
-{
-  "code": 500,
-  "message": "无效的证件信息",
-  "data": null
-}
-```
-
-### 14. getSignUrl — 成功
+### 11. getSignUrl — 成功
 
 | 项 | 值 |
 |----|-----|
 | 渠道路径 | `POST /upChannelApi/getSignUrl` |
 | 华安路径 | `POST http://47.97.156.18:9040/upChannelApi/getSignUrl` |
-| 参数依赖 | proInsurance → policyId=eae53555f376407bb5b179e992a85029; getBankList → bankCode=CCB |
+| 依赖 | proInsurance → policyId=790ebf3612a343e18e2c6b0793560b3e; getBankList → bankCode=CCB |
 | 业务码 | `200` |
-| 耗时 | 1594 ms |
+| 耗时 | 907 ms |
 | 说明 | product=百万医疗-体验版 bank=CCB |
 
-**请求体**：
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
 ```json
 {
@@ -782,13 +645,11 @@ flowchart TD
   "name": "***",
   "payChannelId": "ef70a5a2afea440d86c9a804d0458736",
   "phoneNo": "***",
-  "policyId": "eae53555f376407bb5b179e992a85029",
-  "timestamp": "1782466943687",
-  "userId": "***"
+  "policyId": "790ebf3612a343e18e2c6b0793560b3e",
+  "timestamp": "1783324383695",
+  "userId": "5c819c252ab343e2a2a6df98b3a014ab"
 }
 ```
-
-**请求头**：`sign`、`Content-Type`；common 接口另附 `channelCode`、`timestamp`。
 
 **响应体**：
 
@@ -797,77 +658,160 @@ flowchart TD
   "code": 200,
   "message": "操作成功",
   "data": {
-    "signId": "717530454365831168",
-    "url": "https://baox.hx-hb.com.cn/sd-i/sign.html?signId=717530454365831168"
+    "signId": "1638199514013630464",
+    "url": "http://yl.yming.xin/bx/sign-test.html?signId=1638199514013630464"
   }
 }
 ```
 
-### 15. getProductInfoByChannel — 未执行
+### 12. sms/send — 成功
 
-| 原因 | 华安侧已废弃，由 product/info 替代 |
+| 项 | 值 |
+|----|-----|
+| 渠道路径 | `POST /upChannelApi/sms/send` |
+| 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/sms/send` |
+| 业务码 | `200` |
+| 耗时 | 431 ms |
+| 说明 | 三要素明文 |
 
-### 16. sms/send — 未执行
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
 
-| 原因 | 按约定不测 sms 系列 |
-
-### 17. sms/noValid — 未执行
-
-| 原因 | 按约定不测 sms 系列 |
-
-### 18. sms/valid — 未执行
-
-| 原因 | 按约定不测 sms 系列 |
-
-## 测试结果汇总
-
-| 已执行 | 14 | 成功 | 11 | 失败 | 3 | 未测 | 4 |
-
-### 成功（11）
-
-| 接口 | code |
-|------|------|
-| getBankList | 200 |
-| product/info | 200 |
-| getUserInfoByPhoneNo | 200 |
-| policy/phone | 200 |
-| getProductPricesByProductCode | 200 |
-| priceByUser | 200 |
-| getLiabilitiesByProductId | 200 |
-| proInsurance | 200 |
-| getPolicyInfoByPolicyId | 200 |
-| getProductPricesByPolicyId | 200 |
-| getSignUrl | 200 |
-
-### 失败（3）
-
-| 接口 | code | message |
-|------|------|---------|
-| verifyNoCode | 601 | null |
-| getPolicyInfoByPhoneNo | 601 | null |
-| upGradeIns | 500 | 无效的证件信息 |
-
-### 未执行
-
-- **getProductInfoByChannel**：华安侧已废弃，由 product/info 替代
-- **sms/send**：按约定不测 sms 系列
-- **sms/noValid**：按约定不测 sms 系列
-- **sms/valid**：按约定不测 sms 系列
-
-### 复现命令
-
-```bash
-export HUAAN_BASE_URL="http://47.97.156.18:9040"
-export HUAAN_CHANNEL_CODE="BLtJjF"
-export HUAAN_KEY="***"
-export HUAAN_SIGN_ENABLED=true
-export HUAAN_PROBE_SKIP_SMS=true
-export HUAAN_TEST_PHONE="***"
-export HUAAN_TEST_NAME="***"
-export HUAAN_TEST_ID_CARD="***"
-go run ./scripts/huaan_direct_probe/main.go > probe-test.json
+```json
+{
+  "channelCode": "BLtJjF",
+  "idCard": "***",
+  "name": "***",
+  "phoneNo": "***",
+  "timestamp": "1783324384602"
+}
 ```
 
-## 相关文档
+**响应体**：
 
-- [华安侧接口请求与响应.md](./华安侧接口请求与响应.md) — hahealth 联调环境
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": "验证码发送成功"
+}
+```
+
+### 13. sms/noValid — 成功
+
+| 项 | 值 |
+|----|-----|
+| 渠道路径 | `POST /upChannelApi/sms/noValid` |
+| 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/sms/noValid` |
+| 业务码 | `200` |
+| 耗时 | 114 ms |
+| 说明 | mobile 明文 |
+
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
+
+```json
+{
+  "channelCode": "BLtJjF",
+  "mobile": "***",
+  "timestamp": "1783324385041"
+}
+```
+
+**响应体**：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "idCard": "",
+    "name": "",
+    "userId": "aeebb589ed224ca5a97d4f8f1df252e8",
+    "phoneNo": null,
+    "channelCode": "BLtJjF"
+  }
+}
+```
+
+### 14. sms/valid — 成功
+
+| 项 | 值 |
+|----|-----|
+| 渠道路径 | `POST /upChannelApi/sms/valid` |
+| 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/sms/valid` |
+| 依赖 | sms/send |
+| 业务码 | `200` |
+| 耗时 | 65 ms |
+| 说明 | code 明文 |
+
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
+
+```json
+{
+  "channelCode": "BLtJjF",
+  "code": "3875",
+  "phoneNo": "***",
+  "timestamp": "1783324385159"
+}
+```
+
+**响应体**：
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "idCard": "***",
+    "name": "***",
+    "userId": "5c819c252ab343e2a2a6df98b3a014ab",
+    "phoneNo": "***",
+    "channelCode": "I7fZcM"
+  }
+}
+```
+
+### 15. getPhoneByToken — 失败
+
+| 项 | 值 |
+|----|-----|
+| 渠道路径 | `POST /upChannelApi/getPhoneByToken` |
+| 华安路径 | `POST http://47.97.156.18:9040/common/channel/api/getPhoneByToken` |
+| 业务码 | `500` |
+| 耗时 | 0 ms |
+| 说明 | 占位 token；需 SDK 真实 userInformation+token |
+
+**请求体**（签名开启时 `sign` 在 HTTP 请求头，body 不含 `key`/`sign`）：
+
+```json
+{
+  "channelCode": "BLtJjF",
+  "userInformation": "test",
+  "token": "test",
+  "timestamp": "1783324385407"
+}
+```
+
+**响应体**：
+
+```json
+{
+  "code": 500,
+  "message": "token 校验失败：token校验失败[MSISDN_OWNERS Processor]",
+  "data": null
+}
+```
+
+## 复现命令
+
+```bash
+HUAAN_BASE_URL='http://47.97.156.18:9040' \
+HUAAN_CHANNEL_CODE='BLtJjF' \
+HUAAN_KEY='fb9ec7236b6c45b7bfd562672e0373ea' \
+HUAAN_SIGN_ENABLED=true \
+HUAAN_TEST_PHONE='***' \
+HUAAN_TEST_NAME='***' \
+HUAAN_TEST_ID_CARD='***' \
+HUAAN_PROBE_SKIP_SMS=false \
+HUAAN_TEST_SMS_CODE='3875' \
+go run ./scripts/huaan_direct_probe/
+```

@@ -480,10 +480,10 @@ flowchart LR
 - `channelCode`、`phoneNo`、`code`、`timestamp`
 - 明文末尾标准拼接 `&key={华安渠道密钥}`，MD5 后 32 位大写
 
-示例（`phoneNo=13811045503`，`code=3875`）：
+示例（`phoneNo=***`，`code=3875`）：
 
 ```text
-channelCode=BLtJjF&code=3875&phoneNo=13811045503&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
+channelCode=BLtJjF&code=3875&phoneNo=***&timestamp=1782703244953&key=fb9ec7236b6c45b7bfd562672e0373ea
 → sign=F13AC45360ED163467F3D48FD11A33BE
 ```
 
