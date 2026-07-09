@@ -10,7 +10,7 @@
 | [HUAAN_API_SAMPLES.md](./HUAAN_API_SAMPLES.md) | 华安上游 10 个接口原始 JSON 样例与联调结论 |
 | [CHANNEL_API.md](./CHANNEL_API.md) | **下游渠道商接口文档**（对外）：10 个 API、签名、加解密、示例 |
 | [CHANNEL_API_SAMPLES.md](./CHANNEL_API_SAMPLES.md) | 渠道请求/响应 JSON 样例归档（联调对照） |
-| [DEPLOY.md](./DEPLOY.md) | 交付部署：Docker 安装、配置、启动与运维 |
+| [DEPLOY.md](./DEPLOY.md) | **部署文档**：架构、配置、测试/生产区分、一键部署、HTTPS、运维 |
 | [ALIYUN.md](./ALIYUN.md) | **阿里云上云**：资源采购、安全组、SSH、域名 HTTPS、白名单 |
 | [CHANNEL_INTEGRATION.md](./CHANNEL_INTEGRATION.md) | 已合并至 CHANNEL_API.md（保留跳转） |
 | [PII_CHANNEL_ENCRYPTION.md](./PII_CHANNEL_ENCRYPTION.md) | **方案**：按渠道控制三要素是否加解密、Redis 渠道配置缓存（设计稿，未编码） |
